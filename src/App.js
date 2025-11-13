@@ -348,47 +348,43 @@ function App() {
     }
   };
 
-  // QR生成（超高精度＋空白除去） ← これだけ残す！！！
-  const generateQR = () => {
-    setShowQRCode(true);
-    setTimeout(() => {
-      if (qrCanvasRef.current) {
-        const cleanId = deviceId.replace(/\s/g, '');  // 全空白除去！！
-        QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
-          width: 256, 
-          errorCorrectionLevel: 'H',
-          margin: 2,
-          color: { dark: '#ff4081', light: '#ffffff' }
-        }, (error) => {
-          if (error) console.error(error);
-        });
-      }
-    }, 100);
-  };
-  // QR読み取り（超安定版）
-  const startQRReader = () => {
-    setShowQRReader(true);
-    navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      } 
-    })
-    .then(stream => {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play();
-      requestAnimationFrame(tick);
-    })
-    .catch(err => {
-      alert('カメラアクセス失敗: ' + err.message);
-      setShowQRReader(false);
-    });
-  };
-  
+  {/* QRコード生成モーダル */}
+  {showQRCode && (
+    <div style={{ 
+      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+      background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', 
+      justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
+    }}>
+      <div style={{ background: 'white', borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+        <h3 style={{ margin: '0 0 20px', color: t.dark }}>デバイスID QRコード</h3>
+        <canvas ref={qrCanvasRef} style={{ width: '240px', height: '240px', margin: '0 auto 20px' }} />
+        <p style={{ margin: '10px 0', fontSize: '14px', color: t.dark }}>カメラで読み取って共有！</p>
+        <button onClick={() => setShowQRCode(false)} style={{ background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' }}>
+          閉じる
+        </button>
+      </div>
+    </div>
+  )}
+  {/* QR読み取りモーダル */}
+  {showQRReader && (
+    <div style={{ 
+      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+      background: '#000', display: 'flex', alignItems: 'center', 
+      justifyContent: 'center', zIndex: 2000, flexDirection: 'column'
+    }}>
+      <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px' }} />
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <button onClick={() => {
+        setShowQRReader(false);
+        videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+      }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
+        キャンセル
+      </button>
+    </div>
+  )}
   const tick = () => {
     if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      requestAnimationFrame(tick);
+      if (showQRReader) requestAnimationFrame(tick);
       return;
     }
   
@@ -410,9 +406,9 @@ function App() {
       setShowQRReader(false);
       fetchFolders();
       fetchMemos();
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      alert('QR読み取り成功！');
     } else {
-      requestAnimationFrame(tick);
+      setTimeout(() => requestAnimationFrame(tick), 150);  // 150msデバウンス
     }
   };
 
@@ -808,33 +804,30 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',
-          padding: 0,
-          margin: 0,
+          padding: '20px',  // ← 追加！スマホでも余白確保
           boxSizing: 'border-box'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',
+            width: '100%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
             overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            boxSizing: 'border-box',
+            boxSizing: 'border-box',  // ← 必須！！！
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            margin: 'auto'
+            margin: '0 auto'  // ← 中央固定！
           }}>
             <style jsx>{`
-              div::-webkit-scrollbar { 
-                display: none !important;
-              }
+              div::-webkit-scrollbar { display: none !important; }
             `}</style>
       
+            {/* 以下は全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
