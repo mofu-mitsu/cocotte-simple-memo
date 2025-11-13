@@ -357,9 +357,15 @@ function App() {
   };
 
   const toggleSelectMemo = (id) => {
-    const newSet = new Set(selectedMemos);
-    newSet.has(id) ? newSet.delete(id) : newSet.add(id);
-    setSelectedMemos(newSet);
+    setSelectedMemos(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
   };
 
   const onDragEnd = async (result) => {
@@ -609,7 +615,7 @@ function App() {
                       {(provided) => (
                         <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
                           {folderMemos.map((memo, index) => (
-                            <Draggable key={memo.id} draggableId={String(memo.id)} index={index}>
+                            <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                               {(provided, snapshot) => (
                                 <li 
                                   ref={provided.innerRef} 
@@ -708,7 +714,7 @@ function App() {
                   {(provided) => (
                     <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
                       {memos.filter(m => !m.folder_id).map((memo, index) => (
-                        <Draggable key={memo.id} draggableId={String(memo.id)} index={index}>
+                        <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                           {(provided, snapshot) => (
                             <li 
                               ref={provided.innerRef} 
