@@ -362,18 +362,63 @@ function App() {
   };
 
   // QR読み取り開始（useEffectの外に移動！！！）
+  // QR生成
+  const generateQR = () => {
+    // ... 
+  };
+
+  // QR読み取り開始（useEffectの外に移動！！！これだけ残す！！！）
   const startQRReader = () => {
     setShowQRReader(true);
   };
 
-  // --- useEffect ---
+  // --- useEffectでカメラ処理 ---
   useEffect(() => {
     if (!showQRReader) return;
-    // ... カメラ処理 ...
+
+    let stream = null;
+
+    navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    })
+    .then(s => {
+      stream = s;
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.srcObject = stream;
+      video.play().then(() => {
+        console.log('カメラ開始！サイズ:', video.videoWidth);
+        requestAnimationFrame(tick);
+      }).catch(err => {
+        console.error('play失敗:', err);
+        alert('カメラ再生失敗: ' + err.message);
+        setShowQRReader(false);
+      });
+    })
+    .catch(err => {
+      console.error('カメラアクセス失敗:', err);
+      alert('カメラアクセス失敗: ' + err.message);
+      setShowQRReader(false);
+    });
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
   }, [showQRReader, tick]);
 
+  // tick関数
   const tick = useCallback(() => {
-    // ... 
+    // ... QR読み取り処理 ...
   }, []);
 
   // --- ここから追加 ---
@@ -421,59 +466,6 @@ function App() {
     };
   }, [showQRReader, tick]); // showQRReader と tick が変わったら再実行
   // --- ここまで追加 ---
-
-  const startQRReader = () => {
-    setShowQRReader(true);
-  };
-  const tick = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    // ストリーム停止 or 要素なし
-    if (!video || !canvas || !video.srcObject) return;
-
-    // 準備待ち
-    if (video.readyState < video.HAVE_ENOUGH_DATA || 
-        video.videoWidth === 0 || video.videoHeight === 0) {
-      requestAnimationFrame(tick);
-      return;
-    }
-
-    // 正しいサイズで描画
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "attemptBoth"
-    });
-
-    if (code) {
-      console.log('QR検出成功！データ:', code.data);
-      ctx.strokeStyle = '#ff4081';
-      ctx.lineWidth = Math.max(5, canvas.width / 80);
-      const loc = code.location;
-      ctx.beginPath();
-      ctx.moveTo(loc.topLeftCorner.x, loc.topLeftCorner.y);
-      ctx.lineTo(loc.topRightCorner.x, loc.topRightCorner.y);
-      ctx.lineTo(loc.bottomRightCorner.x, loc.bottomRightCorner.y);
-      ctx.lineTo(loc.bottomLeftCorner.x, loc.bottomLeftCorner.y);
-      ctx.closePath();
-      ctx.stroke();
-
-      const cleanId = code.data.trim();
-      localStorage.setItem('deviceId', cleanId);
-      setDeviceId(cleanId);
-      setShowQRReader(false); // ← useEffectのクリーンアップ発火
-      fetchFolders();
-      fetchMemos();
-      alert('QR読み取り成功！ID: ' + cleanId);
-    } else {
-      requestAnimationFrame(tick);
-    }
-  }, []); // 依存なし！setStateは安定
   
   const toggleFolder = (folderId) => {
     setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
