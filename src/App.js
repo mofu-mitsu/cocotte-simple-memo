@@ -52,19 +52,17 @@ function App() {
   const canvasRef = useRef(null);
   const textareaRef = useRef(null);
   
-  // ← ここを追加！！！！
-  const [isMobile, setIsMobile] = useState(true); // 初期値はtrueで安全に！！
+  const [isMobile, setIsMobile] = useState(true);
   
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-    handleResize(); // 初回も実行！！
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // テーマカラー
   const themeColors = {
     pink: { bg: '#fff5f8', main: '#ff80ab', dark: '#ff4081', light: '#fce4ec', text: '#333' },
     blue: { bg: '#e3f2fd', main: '#64b5f6', dark: '#1976d2', light: '#bbdefb', text: '#333' },
@@ -92,16 +90,13 @@ function App() {
   }, [deviceId, searchQuery, showTrash, selectedDate, folderSearchId]);
   
   useEffect(() => {
-    // ページ全体の横スクロール完全禁止＋中央固定
     document.documentElement.style.overflowX = 'hidden';
     document.body.style.overflowX = 'hidden';
     document.body.style.margin = '0';
     document.body.style.padding = '0';
     document.body.style.width = '100vw';
     document.body.style.boxSizing = 'border-box';
-  
     return () => {
-      // クリーンアップ（念のため）
       document.documentElement.style.overflowX = '';
       document.body.style.overflowX = '';
     };
@@ -348,40 +343,45 @@ function App() {
     }
   };
 
-  {/* QRコード生成モーダル */}
-  {showQRCode && (
-    <div style={{ 
-      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-      background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', 
-      justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
-    }}>
-      <div style={{ background: 'white', borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
-        <h3 style={{ margin: '0 0 20px', color: t.dark }}>デバイスID QRコード</h3>
-        <canvas ref={qrCanvasRef} style={{ width: '240px', height: '240px', margin: '0 auto 20px' }} />
-        <p style={{ margin: '10px 0', fontSize: '14px', color: t.dark }}>カメラで読み取って共有！</p>
-        <button onClick={() => setShowQRCode(false)} style={{ background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' }}>
-          閉じる
-        </button>
-      </div>
-    </div>
-  )}
-  {/* QR読み取りモーダル */}
-  {showQRReader && (
-    <div style={{ 
-      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-      background: '#000', display: 'flex', alignItems: 'center', 
-      justifyContent: 'center', zIndex: 2000, flexDirection: 'column'
-    }}>
-      <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px' }} />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-      <button onClick={() => {
-        setShowQRReader(false);
-        videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
-      }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
-        キャンセル
-      </button>
-    </div>
-  )}
+  // QR生成
+  const generateQR = () => {
+    setShowQRCode(true);
+    setTimeout(() => {
+      if (qrCanvasRef.current) {
+        const cleanId = deviceId.replace(/\s/g, '');
+        QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
+          width: 256, 
+          errorCorrectionLevel: 'H',
+          margin: 2,
+          color: { dark: '#ff4081', light: '#ffffff' }
+        }, (error) => {
+          if (error) console.error(error);
+        });
+      }
+    }, 100);
+  };
+
+  // QR読み取り
+  const startQRReader = () => {
+    setShowQRReader(true);
+    navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    })
+    .then(stream => {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play();
+      requestAnimationFrame(tick);
+    })
+    .catch(err => {
+      alert('カメラアクセス失敗: ' + err.message);
+      setShowQRReader(false);
+    });
+  };
+  
   const tick = () => {
     if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       if (showQRReader) requestAnimationFrame(tick);
@@ -407,8 +407,9 @@ function App() {
       fetchFolders();
       fetchMemos();
       alert('QR読み取り成功！');
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
     } else {
-      setTimeout(() => requestAnimationFrame(tick), 150);  // 150msデバウンス
+      setTimeout(() => requestAnimationFrame(tick), 150);
     }
   };
 
@@ -503,7 +504,6 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {/* 使い方ボタン → スマホは？だけ */}
           <button 
             onClick={() => setShowHelp(true)} 
             style={{ 
@@ -554,7 +554,7 @@ function App() {
         </div>
       </div>
 
-      {/* デバイスID表示（コピーボタン下に移動！！！） */}
+      {/* デバイスID表示 */}
       <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
         <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
@@ -569,36 +569,36 @@ function App() {
         <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで安全にコピー！</p>
       </div>
 
-{/* メモ入力エリア */}
-<div style={{ 
-  background: t.light, 
-  padding: '20px', 
-  borderRadius: '20px', 
-  marginBottom: '20px', 
-  boxShadow: `0 6px 20px ${t.dark}33`,
-  maxWidth: '100%',           // ←追加
-  overflow: 'hidden',         // ←追加
-  boxSizing: 'border-box'     // ←追加
-}}>
-  <textarea 
-    value={newMemo} 
-    onChange={(e) => setNewMemo(e.target.value)} 
-    placeholder="メモを入力（1行目がタイトル）..." 
-    rows="4" 
-    style={{ 
-      width: '100%', 
-      maxWidth: '100%',         // ←追加
-      padding: '14px', 
-      borderRadius: '14px', 
-      border: `3px solid ${t.main}`, 
-      fontSize: '16px', 
-      resize: 'vertical', 
-      lineHeight: '1.8', 
-      background: theme === 'dark' ? '#333' : 'white', 
-      color: t.text,
-      boxSizing: 'border-box'   // ←追加
-    }} 
-  />
+      {/* メモ入力エリア */}
+      <div style={{ 
+        background: t.light, 
+        padding: '20px', 
+        borderRadius: '20px', 
+        marginBottom: '20px', 
+        boxShadow: `0 6px 20px ${t.dark}33`,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
+      }}>
+        <textarea 
+          value={newMemo} 
+          onChange={(e) => setNewMemo(e.target.value)} 
+          placeholder="メモを入力（1行目がタイトル）..." 
+          rows="4" 
+          style={{ 
+            width: '100%', 
+            maxWidth: '100%',
+            padding: '14px', 
+            borderRadius: '14px', 
+            border: `3px solid ${t.main}`, 
+            fontSize: '16px', 
+            resize: 'vertical', 
+            lineHeight: '1.8', 
+            background: theme === 'dark' ? '#333' : 'white', 
+            color: t.text,
+            boxSizing: 'border-box'
+          }} 
+        />
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '15px', alignItems: 'center' }}>
           <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
             <option value="#ffffff">白</option>
@@ -747,8 +747,41 @@ function App() {
         </ul>
       )}
 
-      {/* ログイン・ヘルプ・詳細モーダルは全部 t.main/t.dark/t.light に置き換えてるから長くなるけど全部直してる！ */}
-      {/* （文字数制限あるから省略してるけど、実際は全部t対応にしてるから安心して！） */}
+      {/* QRコード生成モーダル */}
+      {showQRCode && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', 
+          justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
+        }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 20px', color: t.dark }}>デバイスID QRコード</h3>
+            <canvas ref={qrCanvasRef} style={{ width: '240px', height: '240px', margin: '0 auto 20px' }} />
+            <p style={{ margin: '10px 0', fontSize: '14px', color: t.dark }}>カメラで読み取って共有！</p>
+            <button onClick={() => setShowQRCode(false)} Yepstyle={{ background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' }}>
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* QR読み取りモーダル */}
+      {showQRReader && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+          background: '#000', display: 'flex', alignItems: 'center', 
+          justifyContent: 'center', zIndex: 2000, flexDirection: 'column'
+        }}>
+          <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px' }} />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <button onClick={() => {
+            setShowQRReader(false);
+            videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+          }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
+            キャンセル
+          </button>
+        </div>
+      )}
 
       {/* ログイン */}
       {showLoginModal && (
@@ -790,7 +823,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* メモ詳細（宇宙最終版！！！白枠ピンク縁も完全中央！！！） */}
+
+      {/* メモ詳細モーダル */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
@@ -803,30 +837,29 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px',  // ← 追加！スマホでも余白確保
+          padding: '16px',
           boxSizing: 'border-box'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
-            padding: '34px 24px',
+            padding: '30px 20px',
             width: '100%',
-            maxWidth: '600px',
+            maxWidth: '560px',
             minWidth: '280px',
-            maxHeight: '95vh',
+            maxHeight: '92vh',
             overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            boxSizing: 'border-box',  // ← 必須！！！
+            boxSizing: 'border-box',
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            margin: '0 auto'  // ← 中央固定！
+            margin: '0 auto'
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { display: none !important; }
             `}</style>
       
-            {/* 以下は全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
@@ -847,17 +880,17 @@ function App() {
                 addToHistory(e.target.value); 
               }} 
               rows="12" 
-              style={{ width: '100%', padding: '16px', border: `3px solid ${t.main}`, borderRadius: '16px', fontSize: '16px', resize: 'vertical', lineHeight: '1.8', background: theme === 'dark' ? '#333' : 'white', color: t.text }} 
+              style={{ width: '100%', padding: '16px', border: `3px solid ${t.main}`, borderRadius: '16px', fontSize: '16px', resize: 'vertical', lineHeight: '1.8', background: theme === 'dark' ? '#333' : 'white', color: t.text, boxSizing: 'border-box' }} 
             />
             <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
+                <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
                   <option value="#ffffff">白</option>
                   <option value="#ffe6f0">ピンク</option>
                   <option value="#e3f2fd">水色</option>
                   <option value="#e6ffe6">グリーン</option>
                 </select>
-                <select value={selectedMemo.folder_id || ''} onChange={(e) => setSelectedMemo(prev => ({ ...prev, folder_id: e.target.value || null }))} style={{ flex: '1 1 140px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
+                <select value={selectedMemo.folder_id || ''} onChange={(e) => setSelectedMemo(prev => ({ ...prev, folder_id: e.target.value || null }))} style={{ flex: '1 1 140px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
                   <option value="">未分類</option>
                   {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
@@ -892,7 +925,7 @@ function App() {
           </div>
         </div>
       )}
-      {/* ★フッター追加（ここが最後に！） */}
+
       <footer style={{ 
         marginTop: '80px', 
         padding: '30px 20px', 
