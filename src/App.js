@@ -718,6 +718,7 @@ function App() {
       <DragDropContext onDragEnd={onDragEnd}>
         {!showTrash && (
           <div>
+            {/* 未分類フォルダも含めて、すべてのDraggable内のliをこのスタイルに統一 */}
             {folders.map((folder) => {
               const folderMemos = memos.filter(m => m.folder_id === folder.id);
               const isOpen = openFolders[folder.id] || false;
@@ -734,74 +735,85 @@ function App() {
                       {(provided) => (
                         <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
                           {folderMemos.map((memo, index) => (
-                              <Draggable key={memo.id} draggableId={String(memo.id)} index={index}>
-                                {(provided, snapshot) => (
-                                  <li 
-                                    ref={provided.innerRef} 
-                                    {...provided.draggableProps} 
-                                    onClick={() => !isSelectMode && setSelectedMemo(memo)}
+                            <Draggable key={memo.id} draggableId={String(memo.id)} index={index}>
+                              {(provided, snapshot) => (
+                                <li 
+                                  ref={provided.innerRef} 
+                                  {...provided.draggableProps} 
+                                  onClick={() => !isSelectMode && setSelectedMemo(memo)}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    backgroundColor: memo.color,
+                                    padding: '12px',
+                                    margin: '6px 0',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: t.dark,
+                                    boxShadow: snapshot.isDragging 
+                                      ? `0 12px 28px ${t.main}77` 
+                                      : '0 2px 8px rgba(0,0,0,0.1)',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.25s ease',
+                                    transform: snapshot.isDragging ? 'rotate(3deg) scale(1.02)' : 'none'
+                                  }}
+                                >
+                                  {isSelectMode && (
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedMemos.has(memo.id)} 
+                                      onChange={() => toggleSelectMemo(memo.id)} 
+                                      onClick={(e) => e.stopPropagation()} 
+                                      style={{ marginRight: '10px', accentColor: t.main }} 
+                                    />
+                                  )}
+
+                                  {/* 超可愛いテーマ対応ドラッグハンドル */}
+                                  <div 
+                                    {...provided.dragHandleProps}
                                     style={{
-                                      ...provided.draggableProps.style,
-                                      backgroundColor: memo.color,
-                                      padding: '12px',
-                                      margin: '6px 0',
-                                      borderRadius: '12px',
-                                      cursor: 'pointer',
+                                      position: 'absolute',
+                                      left: 0,
+                                      top: 0,
+                                      width: '36px',
+                                      height: '100%',
+                                      background: snapshot.isDragging 
+                                        ? `linear-gradient(90deg, ${t.main}44, transparent)` 
+                                        : `linear-gradient(90deg, ${t.main}33, transparent)`,
                                       display: 'flex',
                                       alignItems: 'center',
-                                      color: t.dark,
-                                      boxShadow: snapshot.isDragging 
-                                        ? `0 8px 20px ${t.main}66` 
-                                        : '0 2px 8px rgba(0,0,0,0.1)',
-                                      position: 'relative',
-                                      overflow: 'hidden',
-                                      transition: 'all 0.2s ease'
+                                      justifyContent: 'center',
+                                      cursor: 'grab',
+                                      opacity: snapshot.isDragging ? 1 : 0.7,
+                                      transition: 'all 0.25s ease',
+                                      borderRadius: '12px 0 0 12px'
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                   >
-                                    {isSelectMode && (
-                                      <input 
-                                        type="checkbox" 
-                                        checked={selectedMemos.has(memo.id)} 
-                                        onChange={() => toggleSelectMemo(memo.id)} 
-                                        onClick={(e) => e.stopPropagation()} 
-                                        style={{ marginRight: '10px' }} 
-                                      />
-                                    )}
+                                    <div style={{
+                                      width: '18px',
+                                      height: '36px',
+                                      borderRadius: '6px',
+                                      boxShadow: snapshot.isDragging ? `0 0 12px ${t.main}` : 'none',
+                                      background: 
+                                        theme === 'pink' 
+                                          ? `repeating-linear-gradient(90deg, ${t.dark}66 0px, transparent 5px, ${t.dark}66 10px)`
+                                          : theme === 'blue'
+                                          ? `repeating-linear-gradient(90deg, ${t.dark}55 0px, transparent 4px, ${t.dark}55 8px)`
+                                          : theme === 'green'
+                                          ? `repeating-linear-gradient(90deg, ${t.dark}77 0px, transparent 6px, ${t.dark}77 12px)`
+                                          : `repeating-linear-gradient(90deg, #bbb 0px, transparent 4px, #bbb 8px)`
+                                    }} />
+                                  </div>
 
-                                    {/* ドラッグハンドル（テーマ対応 + 可愛く） */}
-                                    <div 
-                                      {...provided.dragHandleProps}
-                                      style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        width: '32px',
-                                        height: '100%',
-                                        background: snapshot.isDragging 
-                                          ? `linear-gradient(90deg, ${t.main}33, transparent)` 
-                                          : `linear-gradient(90deg, ${t.main}22, transparent)`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: 'grab',
-                                        opacity: snapshot.isDragging ? 1 : 0.6,
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                    >
-                                      <div style={{
-                                        width: '16px',
-                                        height: '32px',
-                                        background: `repeating-linear-gradient(90deg, ${t.dark}44 0px, transparent 4px, ${t.dark}44 8px)`,
-                                        borderRadius: '4px'
-                                      }} />
-                                    </div>
-
-                                    <strong style={{ marginLeft: '36px', flex: 1 }}>
-                                      {getTitle(memo.text)}
-                                    </strong>
-                                  </li>
-                                )}
-                              </Draggable>
+                                  <strong style={{ marginLeft: '40px', flex: 1, fontSize: '16px' }}>
+                                    {getTitle(memo.text)}
+                                  </strong>
+                                </li>
+                              )}
+                            </Draggable>
                           ))}
                           {provided.placeholder}
                         </ul>
@@ -812,6 +824,7 @@ function App() {
               );
             })}
 
+            {/* 未分類も同じスタイルで統一 */}
             <div>
               <div onClick={() => setIsOpenUncategorized(!isOpenUncategorized)} style={{ background: t.light, padding: '10px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', color: t.dark, boxShadow: `0 3px 10px ${t.dark}26` }}>
                 未分類 ({memos.filter(m => !m.folder_id).length})
@@ -822,11 +835,81 @@ function App() {
                     <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
                       {memos.filter(m => !m.folder_id).map((memo, index) => (
                         <Draggable key={memo.id} draggableId={String(memo.id)} index={index}>
-                          {(provided) => (
-                            <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} onClick={() => !isSelectMode && setSelectedMemo(memo)}
-                              style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
-                              <strong>{getTitle(memo.text)}</strong>
+                          {(provided, snapshot) => (
+                            <li 
+                              ref={provided.innerRef} 
+                              {...provided.draggableProps} 
+                              onClick={() => !isSelectMode && setSelectedMemo(memo)}
+                              style={{
+                                ...provided.draggableProps.style,
+                                backgroundColor: memo.color,
+                                padding: '12px',
+                                margin: '6px 0',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: t.dark,
+                                boxShadow: snapshot.isDragging 
+                                  ? `0 12px 28px ${t.main}77` 
+                                  : '0 2px 8px rgba(0,0,0,0.1)',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                transition: 'all 0.25s ease',
+                                transform: snapshot.isDragging ? 'rotate(3deg) scale(1.02)' : 'none'
+                              }}
+                            >
+                              {isSelectMode && (
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedMemos.has(memo.id)} 
+                                  onChange={() => toggleSelectMemo(memo.id)} 
+                                  onClick={(e) => e.stopPropagation()} 
+                                  style={{ marginRight: '10px', accentColor: t.main }} 
+                                />
+                              )}
+
+                              {/* 超可愛いテーマ対応ドラッグハンドル */}
+                              <div 
+                                {...provided.dragHandleProps}
+                                style={{
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: 0,
+                                  width: '36px',
+                                  height: '100%',
+                                  background: snapshot.isDragging 
+                                    ? `linear-gradient(90deg, ${t.main}44, transparent)` 
+                                    : `linear-gradient(90deg, ${t.main}33, transparent)`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'grab',
+                                  opacity: snapshot.isDragging ? 1 : 0.7,
+                                  transition: 'all 0.25s ease',
+                                  borderRadius: '12px 0 0 12px'
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                <div style={{
+                                  width: '18px',
+                                  height: '36px',
+                                  borderRadius: '6px',
+                                  boxShadow: snapshot.isDragging ? `0 0 12px ${t.main}` : 'none',
+                                  background: 
+                                    theme === 'pink' 
+                                      ? `repeating-linear-gradient(90deg, ${t.dark}66 0px, transparent 5px, ${t.dark}66 10px)`
+                                      : theme === 'blue'
+                                      ? `repeating-linear-gradient(90deg, ${t.dark}55 0px, transparent 4px, ${t.dark}55 8px)`
+                                      : theme === 'green'
+                                      ? `repeating-linear-gradient(90deg, ${t.dark}77 0px, transparent 6px, ${t.dark}77 12px)`
+                                      : `repeating-linear-gradient(90deg, #bbb 0px, transparent 4px, #bbb 8px)`
+                                }} />
+                              </div>
+
+                              <strong style={{ marginLeft: '40px', flex: 1, fontSize: '16px' }}>
+                                {getTitle(memo.text)}
+                              </strong>
                             </li>
                           )}
                         </Draggable>
