@@ -3,28 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <!-- ★AdSenseスクリプト（これで正しい！） -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1330533639940949"
-     crossorigin="anonymous"></script>
+            crossorigin="anonymous"></script>
+
     <!-- PWA基本設定 -->
     <meta name="theme-color" content="#ff80ab" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icon-192.png.PNG" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <!-- ファビコン -->
-    <link rel="icon" href="/favicon.ico.ico" />
+    <link rel="icon" href="/favicon.ico" />
 
     <!-- OGP（SNSで共有した時超可愛く見える！！） -->
     <meta property="og:title" content="Cocotte - Simple Memo App" />
     <meta property="og:description" content="可愛くてシンプルなメモアプリ 色分け・フォルダ・ファイル添付・QR共有全部できる！" />
-    <meta property="og:image" content="https://YOUR-VERCEL-URL.vercel.app/ogp.png.PNG" />
-    <meta property="og:url" content="https://YOUR-VERCEL-URL.vercel.app" />
+    <meta property="og:image" content="https://cocotte-memo.vercel.app/ogp.png" /> <!-- ←ここは自分のURLに変えてね！ -->
+    <meta property="og:url" content="https://cocotte-memo.vercel.app" /> <!-- ←ここも！ -->
     <meta property="og:type" content="website" />
 
     <!-- Twitterカード -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Cocotte - Simple Memo App" />
     <meta name="twitter:description" content="可愛くてシンプルなメモアプリ" />
-    <meta name="twitter:image" content="https://YOUR-VERCEL-URL.vercel.app/ogp.png.PNG" />
+    <meta name="twitter:image" content="https://cocotte-memo.vercel.app/ogp.png" />
 
     <!-- 検索エンジン用 -->
     <meta name="description" content="Cocotteは可愛くてシンプルなメモアプリ。色分け、フォルダ、ファイル添付、QR共有、Undo/Redo全部無料！" />
@@ -39,6 +42,9 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 
-
+    <!-- ★AdSenseのpush（bodyの最後に入れると安全！） -->
+    <script>
+      (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
   </body>
 </html>
