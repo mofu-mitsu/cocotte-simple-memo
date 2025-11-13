@@ -748,7 +748,7 @@ function App() {
     justifyContent: 'center', 
     zIndex: 1000, 
     overflowY: 'auto', 
-    padding: '20px 10px',   // ←左右に余裕追加
+    padding: '20px 20px',   // ←左右20pxずつに統一！
     boxSizing: 'border-box'
   }}>
     <div style={{ 
@@ -756,14 +756,14 @@ function App() {
       borderRadius: '30px', 
       padding: '30px', 
       maxWidth: '560px', 
-      width: 'calc(100% - 40px)',  // ←画面端から20pxずつ離す！
+      width: '100%',           // ←100%に戻す！
       maxHeight: '95vh', 
       overflowY: 'auto',
       boxShadow: `0 20px 60px ${t.dark}88`,
       boxSizing: 'border-box',
-      margin: '0 auto'  // ←これで完全に中央！
+      margin: '0 auto'         // ←これで左右自動均等！
     }}>
-      {/* 中身は全部そのまま！ */}
+      {/* ここから中身全部同じ */}
       <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '20px' }}>
         {highlightText(getTitle(selectedMemo.text).props.children)}
       </h3>
