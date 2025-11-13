@@ -361,21 +361,12 @@ function App() {
     }, 100);
   };
 
-  // モーダル表示時に body スクロール禁止
+  // --- ここから追加 ---
   useEffect(() => {
-    if (selectedMemo || showQRCode || showQRReader || showLoginModal || showHelp) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [selectedMemo, showQRCode, showQRReader, showLoginModal, showHelp]);
+    if (!showQRReader) return;
 
-  // QR読み取り（視覚フィードバック追加 + 高精度）
-  const startQRReader = () => {
-    setShowQRReader(true);
+    let stream = null;
+
     navigator.mediaDevices.getUserMedia({ 
       video: { 
         facingMode: 'environment',
@@ -383,16 +374,19 @@ function App() {
         height: { ideal: 720 }
       } 
     })
-    .then(stream => {
+    .then(s => {
+      stream = s;
       const video = videoRef.current;
+      if (!video) return;
+
       video.srcObject = stream;
-      video.setAttribute('playsinline', true);
       video.play().then(() => {
-        console.log('カメラ開始！videoWidth:', video.videoWidth); // デバッグ
-        requestAnimationFrame(tick);
+        console.log('カメラ開始！サイズ:', video.videoWidth);
+        requestAnimationFrame(tick); // useCallback済の最新tick
       }).catch(err => {
         console.error('play失敗:', err);
         alert('カメラ再生失敗: ' + err.message);
+        setShowQRReader(false);
       });
     })
     .catch(err => {
@@ -400,31 +394,36 @@ function App() {
       alert('カメラアクセス失敗: ' + err.message);
       setShowQRReader(false);
     });
-  };
 
-  const tick = () => {
-    if (!showQRReader) return;
+    // クリーンアップ
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [showQRReader, tick]); // showQRReader と tick が変わったら再実行
+  // --- ここまで追加 ---
 
+  const tick = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // ストリーム停止 or 要素なし
+    if (!video || !canvas || !video.srcObject) return;
 
-    // 基本チェック
-    if (!video || !canvas || video.readyState < video.HAVE_ENOUGH_DATA) {
+    // 準備待ち
+    if (video.readyState < video.HAVE_ENOUGH_DATA || 
+        video.videoWidth === 0 || video.videoHeight === 0) {
       requestAnimationFrame(tick);
       return;
     }
 
-    // ジェミの指摘：videoWidthが0なら待機
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      console.log('ビデオサイズ待ち...'); // デバッグ
-      requestAnimationFrame(tick);
-      return;
-    }
-
-    // 正しいサイズでcanvas設定
+    // 正しいサイズで描画
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -435,7 +434,6 @@ function App() {
 
     if (code) {
       console.log('QR検出成功！データ:', code.data);
-      // 赤枠描画
       ctx.strokeStyle = '#ff4081';
       ctx.lineWidth = Math.max(5, canvas.width / 80);
       const loc = code.location;
@@ -450,15 +448,14 @@ function App() {
       const cleanId = code.data.trim();
       localStorage.setItem('deviceId', cleanId);
       setDeviceId(cleanId);
-      setShowQRReader(false);
+      setShowQRReader(false); // ← useEffectのクリーンアップ発火
       fetchFolders();
       fetchMemos();
       alert('QR読み取り成功！ID: ' + cleanId);
-      video.srcObject.getTracks().forEach(t => t.stop());
     } else {
       requestAnimationFrame(tick);
     }
-  };
+  }, []); // 依存なし！setStateは安定
   
   const toggleFolder = (folderId) => {
     setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
