@@ -348,50 +348,63 @@ function App() {
     }
   };
 
-  // QR生成（空白除去＋URLエンコード）
+  // QR生成（超高精度＋空白除去） ← これだけ残す！！！
   const generateQR = () => {
     setShowQRCode(true);
     setTimeout(() => {
       if (qrCanvasRef.current) {
-        const cleanId = deviceId.trim();  // ← 空白除去！！
-        QRCode.toCanvas(qrCanvasRef.current, cleanId, { width: 240, errorCorrectionLevel: 'H' }, (error) => {
+        const cleanId = deviceId.replace(/\s/g, '');  // 全空白除去！！
+        QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
+          width: 256, 
+          errorCorrectionLevel: 'H',
+          margin: 2,
+          color: { dark: '#ff4081', light: '#ffffff' }
+        }, (error) => {
           if (error) console.error(error);
         });
       }
     }, 100);
   };
+  // QR読み取り（超安定版）
   const startQRReader = () => {
     setShowQRReader(true);
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(stream => {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        requestAnimationFrame(tick);
-      })
-      .catch(err => {
-        alert('カメラアクセス失敗: ' + err.message);
-        setShowQRReader(false);
-      });
+    navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    })
+    .then(stream => {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play();
+      requestAnimationFrame(tick);
+    })
+    .catch(err => {
+      alert('カメラアクセス失敗: ' + err.message);
+      setShowQRReader(false);
+    });
   };
-
-  // QR読み取り（カメラ安定化＋デバウンス）
+  
   const tick = () => {
     if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       requestAnimationFrame(tick);
       return;
     }
   
-    canvasRef.current.height = videoRef.current.videoHeight;
-    canvasRef.current.width = videoRef.current.videoWidth;
+    const video = videoRef.current;
+    canvasRef.current.width = video.videoWidth;
+    canvasRef.current.height = video.videoHeight;
     const ctx = canvasRef.current.getContext('2d');
-    ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+    ctx.drawImage(video, 0, 0, canvasRef.current.width, canvasRef.current.height);
     const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert"
+      inversionAttempts: "attemptBoth"
     });
   
     if (code) {
-      const cleanId = code.data.trim();
+      const cleanId = code.data.replace(/\s/g, '');
       localStorage.setItem('deviceId', cleanId);
       setDeviceId(cleanId);
       setShowQRReader(false);
@@ -399,7 +412,7 @@ function App() {
       fetchMemos();
       videoRef.current.srcObject.getTracks().forEach(t => t.stop());
     } else {
-      setTimeout(() => requestAnimationFrame(tick), 100);  // ← デバウンス！
+      requestAnimationFrame(tick);
     }
   };
 
@@ -559,75 +572,6 @@ function App() {
         </button>
         <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで安全にコピー！</p>
       </div>
-
-      // QR生成（超高精度＋空白除去）
-      const generateQR = () => {
-        setShowQRCode(true);
-        setTimeout(() => {
-          if (qrCanvasRef.current) {
-            const cleanId = deviceId.replace(/\s/g, '');  // ← 全空白除去！！
-            QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
-              width: 256, 
-              errorCorrectionLevel: 'H',
-              margin: 2,
-              color: { dark: '#ff4081', light: '#ffffff' }
-            }, (error) => {
-              if (error) console.error(error);
-            });
-          }
-        }, 100);
-      };
-      
-      // QR読み取り（超安定版）
-      const startQRReader = () => {
-        setShowQRReader(true);
-        navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        })
-        .then(stream => {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          requestAnimationFrame(tick);
-        })
-        .catch(err => {
-          alert('カメラアクセス失敗: ' + err.message);
-          setShowQRReader(false);
-        });
-      };
-      
-      const tick = () => {
-        if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-          requestAnimationFrame(tick);
-          return;
-        }
-      
-        const video = videoRef.current;
-        canvasRef.current.width = video.videoWidth;
-        canvasRef.current.height = video.videoHeight;
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvasRef.current.width, canvasRef.current.height);
-        const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-        
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "attemptBoth"
-        });
-      
-        if (code) {
-          const cleanId = code.data.replace(/\s/g, '');
-          localStorage.setItem('deviceId', cleanId);
-          setDeviceId(cleanId);
-          setShowQRReader(false);
-          fetchFolders();
-          fetchMemos();
-          video.srcObject.getTracks().forEach(t => t.stop());
-        } else {
-          requestAnimationFrame(tick);
-        }
-      };
 
 {/* メモ入力エリア */}
 <div style={{ 
