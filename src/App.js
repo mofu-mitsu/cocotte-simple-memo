@@ -775,33 +775,39 @@ function App() {
         </div>
       )}
   
-      {/* メモ詳細（完全中央） */}
+      {/* メモ詳細（マジで完全中央！！！） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
-          inset: 0, // top, left, right, bottom 全部0にする（left:0, top:0の代わり）
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background: 'rgba(255,182,193,0.95)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',
+          padding: '20px 10px',  // ← 左右を10pxに減らしてズレ防止
           boxSizing: 'border-box',
-          padding: '20px' // ← 横paddingを少なめにする（前は30pxだった）
+          overflowY: 'auto'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px',
-            width: 'min(90%, 600px)', // ← これでスマホでも中央寄せが安定する！
+            width: '100%',
+            maxWidth: '600px',           // ← ここ大事！
+            minWidth: '280px',           // スマホでも潰れないように
             maxHeight: '94vh',
             overflowY: 'auto',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            margin: '0 auto', // ← これも中央寄せの鍵
-            position: 'relative',
+            margin: '0 auto',            // ← これで左右中央！
+            position: 'relative'
           }}>
+            {/* 中身は全部同じでOK！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
-              {highlightText(getTitle(selectedMemo.text).props.children)}
+              {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
               <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? '#ffcdd2' : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', fontSize: '24px' }}>
