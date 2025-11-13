@@ -463,7 +463,16 @@ function App() {
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button onClick={() => setShowHelp(true)} style={{ 
-            background: t.main, color: 'white', border: 'none', padding: '12px 18px', borderRadius: '30px', fontSize: '18px', cursor: 'pointer', boxShadow: `0 6px 18px ${t.dark}4d` 
+            background: t.main, 
+            color: 'white', 
+            border: 'none', 
+            padding: '12px 20px', 
+            borderRadius: '30px', 
+            fontSize: '18px', 
+            cursor: 'pointer', 
+            boxShadow: `0 6px 18px ${t.dark}4d`,
+            whiteSpace: 'nowrap',     // ←折り返し禁止
+            minWidth: '140px'         // ←最低幅確保
           }}>
             <FontAwesomeIcon icon="question-circle" /> 使い方
           </button>
@@ -496,11 +505,14 @@ function App() {
         </div>
       </div>
 
-      {/* デバイスID表示 */}
-      <div style={{ marginBottom: '20px', padding: '12px 16px', background: t.light, borderRadius: '16px', boxShadow: `0 4px 12px ${t.dark}33` }}>
-        <p style={{ margin: 0, fontSize: '15px', color: t.text }}>
-          デバイスID: <span style={{ fontFamily: 'monospace', background: t.bg, padding: '6px 12px', borderRadius: '10px', color: t.dark, fontWeight: 'bold' }}>{deviceId}</span>
+      {/* デバイスID表示 → ここを丸ごと置き換え */}
+      <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
+        <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
+        <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
+          {deviceId.slice(0, 19)}<br/>
+          {deviceId.slice(19)}
         </p>
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑スクショして保存推奨！</p>
       </div>
 
       {/* QRコード表示 */}
@@ -755,25 +767,26 @@ function App() {
       justifyContent: 'center', 
       zIndex: 1000, 
       overflowY: 'auto', 
-      padding: '20px 20px',   // ←左右20pxずつに統一！
+      padding: '20px 24px',        // ←左右24pxで余裕！
       boxSizing: 'border-box'
     }}>
       <div style={{ 
         background: 'white', 
         borderRadius: '30px', 
-        padding: '30px', 
-        maxWidth: '560px', 
-        width: '100%',           // ←100%に戻す！
+        padding: '32px', 
+        maxWidth: '580px', 
+        width: '100%', 
         maxHeight: '95vh', 
         overflowY: 'auto',
-        boxShadow: `0 20px 60px ${t.dark}88`,
+        boxShadow: `0 25px 70px ${t.dark}99`,
         boxSizing: 'border-box',
-        margin: '0 auto'         // ←これで左右自動均等！
+        margin: '0 auto',
+        position: 'relative'
       }}>
-      {/* ここから中身全部同じ */}
-      <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '20px' }}>
-        {highlightText(getTitle(selectedMemo.text).props.children)}
-      </h3>
+        {/* 中身全部同じ */}
+        <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '20px', fontSize: '22px' }}>
+          {highlightText(getTitle(selectedMemo.text).props.children)}
+        </h3>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
               <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? '#ffcdd2' : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', fontSize: '24px' }}>
                 <FontAwesomeIcon icon="undo" />
