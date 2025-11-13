@@ -51,7 +51,16 @@ function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const textareaRef = useRef(null);
-
+  
+  // ← これ追加！！リサイズ対応
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   // テーマカラー
   const themeColors = {
     pink: { bg: '#fff5f8', main: '#ff80ab', dark: '#ff4081', light: '#fce4ec', text: '#333' },
