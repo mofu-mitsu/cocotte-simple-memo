@@ -361,6 +361,21 @@ function App() {
     }, 100);
   };
 
+  // QR読み取り開始（useEffectの外に移動！！！）
+  const startQRReader = () => {
+    setShowQRReader(true);
+  };
+
+  // --- useEffect ---
+  useEffect(() => {
+    if (!showQRReader) return;
+    // ... カメラ処理 ...
+  }, [showQRReader, tick]);
+
+  const tick = useCallback(() => {
+    // ... 
+  }, []);
+
   // --- ここから追加 ---
   useEffect(() => {
     if (!showQRReader) return;
