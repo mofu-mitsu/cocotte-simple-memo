@@ -970,7 +970,6 @@ function App() {
               <button onClick={updateMemo} style={{ background: t.dark, color: 'white', padding: '14px 30px', borderRadius: '30px', fontWeight: 'bold' }}>保存</button>
               <button onClick={() => deleteMemo(selectedMemo.id)} style={{ background: '#d32f2f', color: 'white', padding: '14px 30px', borderRadius: '30px' }}>削除</button>
               <button onClick={() => shareMemo(selectedMemo.id)} style={{ background: t.main, color: 'white', padding: '14px 30px', borderRadius: '30px' }}>共有</button>
-              <button onClick={() => setSelectedMemo(null)} style={{ background: '#999', color: 'white', padding: '14px 30px', borderRadius: '30px' }}>閉じる</button>
             </div>
           </div>
         </div>
