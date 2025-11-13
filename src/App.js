@@ -379,32 +379,41 @@ function App() {
     navigator.mediaDevices.getUserMedia({ 
       video: { 
         facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       } 
     })
     .then(stream => {
-      videoRef.current.srcObject = stream;
-      videoRef.current.setAttribute('playsinline', true); // iOS対応
-      videoRef.current.play();
-      requestAnimationFrame(tick);
+      const video = videoRef.current;
+      video.srcObject = stream;
+      video.setAttribute('playsinline', true);
+      video.play().then(() => {
+        console.log('カメラ開始！videoWidth:', video.videoWidth); // デバッグ
+        requestAnimationFrame(tick);
+      }).catch(err => {
+        console.error('play失敗:', err);
+        alert('カメラ再生失敗: ' + err.message);
+      });
     })
     .catch(err => {
+      console.error('カメラアクセス失敗:', err);
       alert('カメラアクセス失敗: ' + err.message);
       setShowQRReader(false);
     });
   };
 
   const tick = () => {
-    if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      if (showQRReader) requestAnimationFrame(tick);
-      return;
-    }
+    if (!showQRReader) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -414,36 +423,30 @@ function App() {
     });
 
     if (code) {
-      // 検出時に赤枠描画
+      console.log('QR検出成功！データ:', code.data); // デバッグ
+      // 赤枠描画
       ctx.strokeStyle = '#ff4081';
-      ctx.lineWidth = 6;
+      ctx.lineWidth = Math.max(4, canvas.width / 100);
+      const loc = code.location;
       ctx.strokeRect(
-        code.location.topLeftCorner.x,
-        code.location.topLeftCorner.y,
-        code.location.bottomRightCorner.x - code.location.topLeftCorner.x,
-        code.location.bottomRightCorner.y - code.location.topLeftCorner.y
+        loc.topLeftCorner.x, loc.topLeftCorner.y,
+        loc.bottomRightCorner.x - loc.topLeftCorner.x,
+        loc.bottomRightCorner.y - loc.topLeftCorner.y
       );
-      videoRef.current.style.display = 'none'; // 枠が見えるように
-      canvas.style.display = 'block';
-      canvas.style.position = 'absolute';
-      canvas.style.top = '0';
-      canvas.style.left = '0';
-      canvas.style.width = '100%';
-      canvas.style.maxWidth = '400px';
-      canvas.style.borderRadius = '16px';
 
-      const cleanId = code.data.replace(/\s/g, '');
+      const cleanId = code.data.trim();
       localStorage.setItem('deviceId', cleanId);
       setDeviceId(cleanId);
       setShowQRReader(false);
       fetchFolders();
       fetchMemos();
-      alert('QR読み取り成功！');
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      alert('QR読み取り成功！ID: ' + cleanId);
+      video.srcObject.getTracks().forEach(t => t.stop());
     } else {
-      requestAnimationFrame(tick); // 確実にループ
+      requestAnimationFrame(tick);
     }
   };
+  
   const toggleFolder = (folderId) => {
     setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
   };
@@ -803,15 +806,25 @@ function App() {
           background: '#000', display: 'flex', alignItems: 'center', 
           justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
         }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-            <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', display: 'block' }} />
-            <canvas ref={canvasRef} style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '100%', borderRadius: '16px' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: '400px', aspectRatio: '4/3' }}>
+            <video 
+              ref={videoRef} 
+              style={{ 
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+                objectFit: 'cover', borderRadius: '16px', zIndex: 1 
+              }} 
+            />
+            <canvas 
+              ref={canvasRef} 
+              style={{ 
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+                borderRadius: '16px', zIndex: 2, background: 'transparent'
+              }} 
+            />
           </div>
           <button onClick={() => {
             setShowQRReader(false);
             videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
-            canvasRef.current.style.display = 'none';
-            videoRef.current.style.display = 'block';
           }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
             キャンセル
           </button>
@@ -867,7 +880,7 @@ function App() {
           left: 0,
           width: '100vw',
           height: '100vh',
-          background: 'rgba(255,182,193,0.95)',
+          background: `${t.main}ee`, // ← ここを動的に！（ピンク固定やめ）
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -897,7 +910,7 @@ function App() {
               div::-webkit-scrollbar { display: none !important; }
             `}</style>
 
-            {/* 閉じるボタン（上固定） */}
+            {/* 閉じるボタン */}
             <button onClick={() => setSelectedMemo(null)} style={{ 
               alignSelf: 'flex-end', 
               background: '#999', 
@@ -913,15 +926,21 @@ function App() {
             <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 18px', fontSize: '22px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
-              <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? '#ffcdd2' : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', fontSize: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
+              <button onClick={undo} disabled={historyIndex <= 0} style={{ 
+                background: historyIndex <= 0 ? t.light : t.main, 
+                color: 'white', padding: '14px 18px', borderRadius: '50%', fontSize: '22px' 
+              }}>
                 <FontAwesomeIcon icon="undo" />
               </button>
-              <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ background: historyIndex >= history.length - 1 ? '#ffcdd2' : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', fontSize: '24px' }}>
+              <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ 
+                background: historyIndex >= history.length - 1 ? t.light : t.main, 
+                color: 'white', padding: '14px 18px', borderRadius: '50%', fontSize: '22px' 
+              }}>
                 <FontAwesomeIcon icon="redo" />
               </button>
             </div>
-            <div style={{ textAlign: 'right', color: t.dark, fontWeight: 'bold', marginBottom: '10px' }}>文字数: {charCount}</div>
+            <div style={{ textAlign: 'right', color: t.dark, fontWeight: 'bold', marginBottom: '8px', fontSize: '14px' }}>文字数: {charCount}</div>
             <textarea 
               ref={textareaRef} 
               value={selectedMemo.text} 
