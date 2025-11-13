@@ -778,16 +778,28 @@ function App() {
       {/* メモ詳細（完全中央） */}
       {selectedMemo && (
         <div style={{ 
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-          background: 'rgba(255,182,193,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-          zIndex: 1000, padding: '20px 30px', boxSizing: 'border-box', overflowY: 'auto'
+          position: 'fixed',
+          inset: 0, // top, left, right, bottom 全部0にする（left:0, top:0の代わり）
+          background: 'rgba(255,182,193,0.95)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          overflowY: 'auto',
+          boxSizing: 'border-box',
+          padding: '20px' // ← 横paddingを少なめにする（前は30pxだった）
         }}>
-          <div style={{ 
-            background: 'white', borderRadius: '32px', padding: '34px', maxWidth: '600px', width: '100%', 
-            maxHeight: '94vh', overflowY: 'auto', boxShadow: `0 30px 80px ${t.dark}aa`, 
-            boxSizing: 'border-box', margin: 'auto', position: 'relative', left: 0, right: 0
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            padding: '34px',
+            width: 'min(90%, 600px)', // ← これでスマホでも中央寄せが安定する！
+            maxHeight: '94vh',
+            overflowY: 'auto',
+            boxShadow: `0 30px 80px ${t.dark}aa`,
+            margin: '0 auto', // ← これも中央寄せの鍵
+            position: 'relative',
           }}>
-            {/* 中身全部同じ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(getTitle(selectedMemo.text).props.children)}
             </h3>
@@ -874,7 +886,7 @@ function App() {
           </a>
         </div>
         <p style={{ margin: '10px 0', fontSize: '11px', opacity: 0.8 }}>
-          © 2025 みつき Cocotte All Rights Reserved.
+          © 2025 もふみつ Cocotte All Rights Reserved.
         </p>
       </footer>
     </div>
