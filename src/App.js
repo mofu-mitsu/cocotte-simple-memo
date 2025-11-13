@@ -788,22 +788,22 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px 10px',  // ← 左右を10pxに減らしてズレ防止
-          boxSizing: 'border-box',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          padding: 0
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
-            padding: '34px',
+            padding: '34px 20px',
             width: '100%',
-            maxWidth: '600px',           // ← ここ大事！
-            minWidth: '280px',           // スマホでも潰れないように
+            maxWidth: '600px',
+            minWidth: '280px',
             maxHeight: '94vh',
             overflowY: 'auto',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            margin: '0 auto',            // ← これで左右中央！
-            position: 'relative'
+            margin: '20px auto',
+            position: 'relative',
+            boxSizing: 'border-box'
           }}>
             {/* 中身は全部同じでOK！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
