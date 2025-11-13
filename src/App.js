@@ -541,21 +541,19 @@ function App() {
         </div>
       </div>
 
-      {/* デバイスID表示（空白なしコピー機能付き！！！） */}
+      {/* デバイスID表示（コピーボタン下に移動！！！） */}
       <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
-            {deviceId}
-          </p>
-          <button onClick={() => {
-            navigator.clipboard.writeText(deviceId);
-            alert('デバイスIDをコピーしたよ！（空白なし）');
-          }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: t.main, color: 'white', border: 'none', padding: '6px 10px', borderRadius: '8px', fontSize: '12px' }}>
-            コピー
-          </button>
-        </div>
-        <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで空白なしでコピーできるよ！</p>
+        <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
+          {deviceId}
+        </p>
+        <button onClick={() => {
+          navigator.clipboard.writeText(deviceId);
+          alert('デバイスIDをコピーしたよ！（空白なし）');
+        }} style={{ marginTop: '10px', background: t.main, color: 'white', padding: '8px 16px', borderRadius: '12px', fontSize: '14px' }}>
+          コピー（空白なし）
+        </button>
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで安全にコピー！</p>
       </div>
 
       {/* QRコード表示 */}
@@ -797,58 +795,45 @@ function App() {
           </div>
         </div>
       )}
-  
-      {/* メモ詳細（マジで完全中央！！！） */}
+
+      {/* メモ詳細（神復元版！！！昔のまともな状態＋完全中央！！！） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
-          inset: 0,
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
           background: 'rgba(255,182,193,0.95)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px',              // ← 上下左右均等に余白！
-          boxSizing: 'border-box',
-          overflow: 'hidden',           // ← 親は隠す！
-          overscrollBehavior: 'none',
-          touchAction: 'pan-y'
+          overflowY: 'auto',      // ← 昔と同じ！！親にスクロール！
+          padding: '20px 0',      // ← 昔と同じ！！左右パディングなし！
+          boxSizing: 'border-box'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '100%',
+            width: '90%',           // ← 昔と同じ90%！！！
             maxWidth: '600px',
             minWidth: '280px',
-            maxHeight: '100%',
-            overflowY: 'auto',            // ← 子だけスクロール！
+            maxHeight: '95vh',
+            overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
-            // ★最強のスクロールバー完全非表示（全ブラウザ対応！！！）
+            // スクロールバー非表示（昔と同じ）
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-            // iOS Safari でも絶対隠す！
-            WebkitOverflowScrolling: 'touch',
-            // スクロールバーの幅分も補正！
-            paddingRight: '20px',
-            marginRight: '-20px'
+            scrollbarWidth: 'none'
           }}>
-            {/* ★これが最重要！！！全ブラウザでスクロールバー完全消去！！！ */}
             <style jsx>{`
-              div { 
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-              }
-              div::-webkit-scrollbar { 
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-              }
+              div::-webkit-scrollbar { display: none; }
             `}</style>
       
-            {/* 中身全部同じ！！！ */}
+            {/* 中身全部昔のまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
