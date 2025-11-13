@@ -717,52 +717,59 @@ function App() {
       {/* ヘルプ */}
       {showHelp && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,182,193,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'white', borderRadius: '25px', padding: '25px', maxWidth: '520px', width: '90%', boxShadow: `0 15px 40px ${t.dark}66` }}>
-            <h3 style={{ color: t.dark, textAlign: 'center' }}>Cocotte の使い方</h3>
-            <p style={{ color: t.dark, fontSize: '14px', lineHeight: '1.8' }}>
+          <div style={{ background: 'white', borderRadius: '25px', padding: '25px', maxWidth: '520px', width: '90%', boxShadow: `0 15px 40px ${t.dark}66`, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '20px' }}>Cocotte の使い方</h3>
+            <p style={{ color: t.dark, fontSize: '14px', lineHeight: '1.9' }}>
               <strong>・メモ追加</strong>: テキスト入力 → 色・フォルダ → 「追加」<br/>
               <strong>・Undo/Redo</strong>: 編集中に Ctrl+Z / Ctrl+Y<br/>
               <strong>・検索</strong>: 文字 / 日付 / フォルダ<br/>
               <strong>・共有</strong>: 詳細 → 共有 → URLコピー<br/>
               <strong>・ログイン</strong>: ID入力 or QRスキャン<br/><br/>
+              
               <strong style={{ color: '#d32f2f' }}>【重要】プライベートモードについて</strong><br/>
               シークレットモードやプライベートブラウジングだと<br/>
               「ID変更」や「ブラウザ更新」でIDがリセットされることがあります！<br/>
               <strong>→ 別の場所（メモ帳やスクショ）にデバイスIDを保存しておくのが超おすすめ！</strong><br/>
-              （PWA化しても念のため保存しとくと安心）
+              （PWA化しても念のため保存しとくと安心）<br/><br/>
+      
+              <strong style={{ color: '#ff4081' }}>【超便利】PWAでアプリ化しよう！</strong><br/>
+              iPhone: 共有ボタン → 「ホーム画面に追加」<br/>
+              Android: メニュー → 「ホーム画面に追加」<br/>
+              → ブラウザ開かずにワンタップで起動できる！<br/>
+              オフラインでも使えるし通知も来るよ✨
             </p>
-            <button onClick={() => setShowHelp(false)} style={{ background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', margin: '0 auto', display: 'block' }}>閉じる</button>
+            <button onClick={() => setShowHelp(false)} style={{ background: t.main, color: 'white', padding: '14px 28px', borderRadius: '30px', margin: '20px auto 0', display: 'block', fontWeight: 'bold' }}>閉じる</button>
           </div>
         </div>
       )}
-
-{/* メモ詳細 */}
-{selectedMemo && (
-  <div style={{ 
-    position: 'fixed', 
-    top: 0, left: 0, 
-    width: '100%', height: '100%', 
-    background: 'rgba(255,182,193,0.95)', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    zIndex: 1000, 
-    overflowY: 'auto', 
-    padding: '20px 20px',   // ←左右20pxずつに統一！
-    boxSizing: 'border-box'
-  }}>
+  
+  {/* メモ詳細 */}
+  {selectedMemo && (
     <div style={{ 
-      background: 'white', 
-      borderRadius: '30px', 
-      padding: '30px', 
-      maxWidth: '560px', 
-      width: '100%',           // ←100%に戻す！
-      maxHeight: '95vh', 
-      overflowY: 'auto',
-      boxShadow: `0 20px 60px ${t.dark}88`,
-      boxSizing: 'border-box',
-      margin: '0 auto'         // ←これで左右自動均等！
+      position: 'fixed', 
+      top: 0, left: 0, 
+      width: '100%', height: '100%', 
+      background: 'rgba(255,182,193,0.95)', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      zIndex: 1000, 
+      overflowY: 'auto', 
+      padding: '20px 20px',   // ←左右20pxずつに統一！
+      boxSizing: 'border-box'
     }}>
+      <div style={{ 
+        background: 'white', 
+        borderRadius: '30px', 
+        padding: '30px', 
+        maxWidth: '560px', 
+        width: '100%',           // ←100%に戻す！
+        maxHeight: '95vh', 
+        overflowY: 'auto',
+        boxShadow: `0 20px 60px ${t.dark}88`,
+        boxSizing: 'border-box',
+        margin: '0 auto'         // ←これで左右自動均等！
+      }}>
       {/* ここから中身全部同じ */}
       <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '20px' }}>
         {highlightText(getTitle(selectedMemo.text).props.children)}
