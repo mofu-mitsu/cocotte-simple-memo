@@ -795,13 +795,17 @@ function App() {
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
-          inset: 0,  // ← これで top/left/right/bottom: 0
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background: 'rgba(255,182,193,0.95)',
-          display: 'grid',
-          placeItems: 'center',  // ← flex じゃなくて grid で完全中央！！
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           zIndex: 1000,
-          margin: 0,
           padding: 0,
+          margin: 0,
           overflow: 'hidden',
           overscrollBehavior: 'none',
           touchAction: 'pan-y'
@@ -810,17 +814,20 @@ function App() {
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: 'calc(100vw - 40px)',  // ← 左右20pxずつ余白！
+            width: '100%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '94vh',
             overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
+            margin: '20px',
             position: 'relative',
             boxSizing: 'border-box',
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none'
+            scrollbarWidth: 'none',
+            // ★ここが最強！！！強制的に左に10pxずらす！！
+            transform: 'translateX(-10px)'
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { display: none; }
