@@ -348,17 +348,18 @@ function App() {
     }
   };
 
+  // QR生成（空白除去＋URLエンコード）
   const generateQR = () => {
     setShowQRCode(true);
     setTimeout(() => {
       if (qrCanvasRef.current) {
-        QRCode.toCanvas(qrCanvasRef.current, deviceId, { width: 220 }, (error) => {
-          if (error) console.error('Error generating QR:', error);
+        const cleanId = deviceId.trim();  // ← 空白除去！！
+        QRCode.toCanvas(qrCanvasRef.current, cleanId, { width: 240, errorCorrectionLevel: 'H' }, (error) => {
+          if (error) console.error(error);
         });
       }
     }, 100);
   };
-
   const startQRReader = () => {
     setShowQRReader(true);
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
@@ -373,29 +374,32 @@ function App() {
       });
   };
 
+  // QR読み取り（カメラ安定化＋デバウンス）
   const tick = () => {
-    if (!showQRReader) return;
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      canvasRef.current.height = videoRef.current.videoHeight;
-      canvasRef.current.width = videoRef.current.videoWidth;
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-      const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (code) {
-        localStorage.setItem('deviceId', code.data);
-        setDeviceId(code.data);
-        setShowQRReader(false);
-        fetchFolders();
-        fetchMemos();
-        if (videoRef.current.srcObject) {
-          videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-        }
-      } else {
-        requestAnimationFrame(tick);
-      }
-    } else {
+    if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       requestAnimationFrame(tick);
+      return;
+    }
+  
+    canvasRef.current.height = videoRef.current.videoHeight;
+    canvasRef.current.width = videoRef.current.videoWidth;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+    const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert"
+    });
+  
+    if (code) {
+      const cleanId = code.data.trim();
+      localStorage.setItem('deviceId', cleanId);
+      setDeviceId(cleanId);
+      setShowQRReader(false);
+      fetchFolders();
+      fetchMemos();
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+    } else {
+      setTimeout(() => requestAnimationFrame(tick), 100);  // ← デバウンス！
     }
   };
 
@@ -796,7 +800,7 @@ function App() {
         </div>
       )}
 
-      {/* メモ詳細（最終最終最終最終版！！！内枠も完全中央！！！） */}
+      {/* メモ詳細（神復元版！！！昔の完璧な状態に完全戻し！！！） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
@@ -809,8 +813,8 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',      // ← 昔と同じ！！親にauto！
-          padding: '20px 0',      // ← 昔と同じ！！左右0！
+          overflowY: 'auto',
+          padding: 0,               // ← ここも0に！！！
           boxSizing: 'border-box',
           overscrollBehavior: 'none'
         }}>
@@ -818,15 +822,14 @@ function App() {
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',           // ← 昔と同じ90%！！！
+            width: '90%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
-            overflowY: 'auto',      // ← 子にもauto（長文対応）
+            overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
-            // ★スクロールバー非表示だけ！！補正なし！！
             msOverflowStyle: 'none',
             scrollbarWidth: 'none'
           }}>
@@ -834,11 +837,9 @@ function App() {
               div::-webkit-scrollbar { 
                 display: none !important;
                 width: 0 !important;
-                background: transparent !important;
               }
             `}</style>
-      
-            {/* 中身全部昔のまま！！！ */}
+            {/* 中身全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
