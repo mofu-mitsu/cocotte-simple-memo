@@ -642,9 +642,8 @@ function App() {
                                   }}
                                 >
                                   {isSelectMode && (
-                                    <  <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', accentColor: t.main }} />
+                                    <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', accentColor: t.main }} />
                                   )}
-      
                                   <div
                                     {...provided.dragHandleProps}
                                     style={{
@@ -788,7 +787,9 @@ function App() {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {memos.map((memo) => (
             <li key={memo.id} style={{ backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} style={{ marginRight: '10px' }} />}
+              {isSelectMode && (
+                <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', accentColor: t.main }} />
+              )}
               <strong>{getTitle(memo.text)}</strong>
               <button onClick={() => restoreMemo(memo.id)} style={{ marginLeft: 'auto', background: t.main, color: 'white', padding: '8px 14px', borderRadius: '20px' }}>復元</button>
             </li>
