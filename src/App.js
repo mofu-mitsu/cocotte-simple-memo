@@ -90,6 +90,22 @@ function App() {
       fetchMemos();
     }
   }, [deviceId, searchQuery, showTrash, selectedDate, folderSearchId]);
+  
+  useEffect(() => {
+    // ページ全体の横スクロール完全禁止＋中央固定
+    document.documentElement.style.overflowX = 'hidden';
+    document.body.style.overflowX = 'hidden';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.width = '100vw';
+    document.body.style.boxSizing = 'border-box';
+  
+    return () => {
+      // クリーンアップ（念のため）
+      document.documentElement.style.overflowX = '';
+      document.body.style.overflowX = '';
+    };
+  }, []);
 
   // メモ選択時に履歴リセット
   useEffect(() => {
@@ -779,49 +795,35 @@ function App() {
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,  // ← これで top/left/right/bottom: 0
           background: 'rgba(255,182,193,0.95)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'grid',
+          placeItems: 'center',  // ← flex じゃなくて grid で完全中央！！
           zIndex: 1000,
-          padding: 0,
           margin: 0,
-          overflow: 'hidden',           // ← 横も縦も隠す！
-          overscrollBehavior: 'none',   // ← スクロールの跳ね返り防止！
-          touchAction: 'pan-y'          // ← スマホで横スワイプ禁止！
+          padding: 0,
+          overflow: 'hidden',
+          overscrollBehavior: 'none',
+          touchAction: 'pan-y'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '100%',
+            width: 'calc(100vw - 40px)',  // ← 左右20pxずつ余白！
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '94vh',
-            overflowY: 'auto',            // ← 縦だけスクロール！
-            overflowX: 'hidden',          // ← 横は完全禁止！
+            overflowY: 'auto',
+            overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            margin: '20px',
             position: 'relative',
             boxSizing: 'border-box',
-            // スクロールバー完全非表示
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-            WebkitOverflowScrolling: 'touch'
+            scrollbarWidth: 'none'
           }}>
-            {/* スクロールバー非表示（全ブラウザ対応） */}
             <style jsx>{`
-              div::-webkit-scrollbar {
-                display: none;
-              }
-              div {
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-              }
+              div::-webkit-scrollbar { display: none; }
             `}</style>
       
             {/* 中身全部同じ！！！ */}
