@@ -620,8 +620,11 @@ function App() {
                                 <li 
                                   ref={provided.innerRef} 
                                   {...provided.draggableProps} 
-                                  onClick={() => !isSelectMode && setSelectedMemo(memo)}
-                                  style={{
+                                  onClick={() => {
+                                    if (!isSelectMode) setSelectedMemo(memo);  // ← ここに if 追加
+                                  }}
+                                  style={{ ... }}
+                                >
                                     ...provided.draggableProps.style,
                                     backgroundColor: memo.color,
                                     padding: '12px',
