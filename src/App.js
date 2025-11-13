@@ -434,7 +434,7 @@ function App() {
     }}>
 
       {/* タイトルバー */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ 
           background: `linear-gradient(135deg, ${t.main}, ${t.dark})`, 
           padding: '16px 32px', 
@@ -461,21 +461,20 @@ function App() {
           <h1 style={{ margin: 0, fontSize: '36px', color: 'white', textShadow: '2px 2px 4px rgba(0,0,0,0.4)' }}>Cocotte</h1>
         </div>
 
-        {/* 使い方ボタン → これに丸ごと置き換え */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          {/* PCは文字付き、スマホは？だけ */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* 使い方ボタン → スマホは？だけ */}
           <button 
             onClick={() => setShowHelp(true)} 
             style={{ 
               background: t.main, 
               color: 'white', 
               border: 'none', 
-              padding: window.innerWidth <= 768 ? '14px' : '12px 20px', 
+              padding: isMobile ? '14px' : '12px 20px', 
               borderRadius: '50%', 
               fontSize: '20px', 
               cursor: 'pointer', 
               boxShadow: `0 6px 18px ${t.dark}4d`,
-              width: window.innerWidth <= 768 ? '50px' : 'auto',
+              minWidth: isMobile ? '50px' : 'auto',
               height: '50px',
               display: 'flex',
               alignItems: 'center',
@@ -483,9 +482,8 @@ function App() {
             }}
           >
             <FontAwesomeIcon icon="question" />
-            {window.innerWidth > 768 && <span style={{ marginLeft: '8px', fontSize: '16px' }}>使い方</span>}
+            {!isMobile && <span style={{ marginLeft: '8px', fontSize: '16px' }}>使い方</span>}
           </button>
-        </div>
 
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowMenu(!showMenu)} style={{ 
@@ -515,7 +513,7 @@ function App() {
         </div>
       </div>
 
-      {/* デバイスID表示 → ここを丸ごと置き換え */}
+      {/* デバイスID表示（改行版） */}
       <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
         <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
@@ -765,36 +763,17 @@ function App() {
         </div>
       )}
   
-      {/* メモ詳細 → 完全左右対称 + スマホでも完璧 */}
+      {/* メモ詳細（完全中央） */}
       {selectedMemo && (
         <div style={{ 
-          position: 'fixed', 
-          top: 0, left: 0, 
-          width: '100%', 
-          height: '100%', 
-          background: 'rgba(255,182,193,0.95)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          zIndex: 1000, 
-          padding: '20px 30px',           // ←左右30pxで超余裕！
-          boxSizing: 'border-box',
-          overflowY: 'auto'
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+          background: 'rgba(255,182,193,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          zIndex: 1000, padding: '20px 30px', boxSizing: 'border-box', overflowY: 'auto'
         }}>
           <div style={{ 
-            background: 'white', 
-            borderRadius: '32px', 
-            padding: '34px', 
-            maxWidth: '600px', 
-            width: '100%', 
-            maxHeight: '94vh', 
-            overflowY: 'auto',
-            boxShadow: `0 30px 80px ${t.dark}aa`,
-            boxSizing: 'border-box',
-            margin: 'auto',                 // ←これが最強の中央寄せ！
-            position: 'relative',
-            left: 0,
-            right: 0
+            background: 'white', borderRadius: '32px', padding: '34px', maxWidth: '600px', width: '100%', 
+            maxHeight: '94vh', overflowY: 'auto', boxShadow: `0 30px 80px ${t.dark}aa`, 
+            boxSizing: 'border-box', margin: 'auto', position: 'relative', left: 0, right: 0
           }}>
             {/* 中身全部同じ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
@@ -862,6 +841,30 @@ function App() {
           </div>
         </div>
       )}
+      {/* ★フッター追加（ここが最後に！） */}
+      <footer style={{ 
+        marginTop: '80px', 
+        padding: '30px 20px', 
+        textAlign: 'center', 
+        fontSize: '12px', 
+        color: t.text, 
+        borderTop: `3px solid ${t.light}`, 
+        background: t.bg,
+        position: 'relative',
+        zIndex: 1
+      }}>
+        <div style={{ marginBottom: '12px' }}>
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{ color: t.main, margin: '0 18px', textDecoration: 'none', fontWeight: 'bold' }}>
+            プライバシーポリシー
+          </a>
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" style={{ color: t.main, margin: '0 18px', textDecoration: 'none', fontWeight: 'bold' }}>
+            利用規約
+          </a>
+        </div>
+        <p style={{ margin: '10px 0', fontSize: '11px', opacity: 0.8 }}>
+          © 2025 みつき Cocotte All Rights Reserved.
+        </p>
+      </footer>
     </div>
   );
 }
