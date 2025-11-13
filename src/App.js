@@ -433,7 +433,7 @@ function App() {
       {/* デバイスID（影が被らないよう余白） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap', paddingTop: '10px' }}>
         <p style={{ margin: 0, fontSize: '15px' }}>
-          デバイスID: <span style={{ fontFamily: 'monospace', background: '#fce4ec', padding: '8px 14px', borderRadius: '12px', color: '#d81b60' }}>{deviceId}</span>
+          デバイスID: <span className="device-id-text" style={{ fontFamily: 'monospace', background: '#fce4ec', padding: '8px 14px', borderRadius: '12px', color: '#d81b60' }}>{deviceId}</span>
         </p>
         <div style={{ display: 'flex', gap: '14px' }}>
           <button onClick={changeDeviceId} style={{ background: '#ff80ab', color: 'white', border: 'none', padding: '12px 18px', borderRadius: '28px', cursor: 'pointer' }}>

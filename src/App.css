@@ -1,9 +1,9 @@
 
 
-.device-id {
+.device-id-text {
   word-break: break-all;
-  font-size: 12px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word; /* より強力な改行 */
   display: block;
-  margin-top: 5px;
+  font-size: 14px; /* 少し大きくして見やすく */
+  line-height: 1.2;
 }
