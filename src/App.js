@@ -52,11 +52,14 @@ function App() {
   const canvasRef = useRef(null);
   const textareaRef = useRef(null);
   
-  // ← これ追加！！リサイズ対応
+  // ← ここを追加！！！！
+  const [isMobile, setIsMobile] = useState(true); // 初期値はtrueで安全に！！
+  
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
     };
+    handleResize(); // 初回も実行！！
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
