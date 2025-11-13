@@ -3,8 +3,6 @@ import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import QRCode from 'qrcode';
-import jsQR from 'jsqr';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
@@ -26,10 +24,8 @@ function App() {
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchType, setSearchType] = useState('text');
   const [folderSearchId, setFolderSearchId] = useState('');
-  const [showQRReader, setShowQRReader] = useState(false);
   const [openFolders, setOpenFolders] = useState({});
   const [isOpenUncategorized, setIsOpenUncategorized] = useState(false);
-  const [showQRCode, setShowQRCode] = useState(false);
   const [selectedMemos, setSelectedMemos] = useState(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -47,9 +43,6 @@ function App() {
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { indexRef.current = historyIndex; }, [historyIndex]);
 
-  const qrCanvasRef = useRef(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const textareaRef = useRef(null);
   
   const [isMobile, setIsMobile] = useState(true);
@@ -342,130 +335,6 @@ function App() {
       fetchMemos();
     }
   };
-
-  // QR生成
-  const generateQR = () => {
-    setShowQRCode(true);
-    setTimeout(() => {
-      if (qrCanvasRef.current) {
-        const cleanId = deviceId.replace(/\s/g, '');
-        QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
-          width: 256, 
-          errorCorrectionLevel: 'H',
-          margin: 2,
-          color: { dark: '#ff4081', light: '#ffffff' }
-        }, (error) => {
-          if (error) console.error(error);
-        });
-      }
-    }, 100);
-  };
-
-  // QR読み取り開始（useEffectの外に移動！！！）
-  // QR生成
-  const generateQR = () => {
-    // ... 
-  };
-
-  // QR読み取り開始（useEffectの外に移動！！！これだけ残す！！！）
-  const startQRReader = () => {
-    setShowQRReader(true);
-  };
-
-  // --- useEffectでカメラ処理 ---
-  useEffect(() => {
-    if (!showQRReader) return;
-
-    let stream = null;
-
-    navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      } 
-    })
-    .then(s => {
-      stream = s;
-      const video = videoRef.current;
-      if (!video) return;
-
-      video.srcObject = stream;
-      video.play().then(() => {
-        console.log('カメラ開始！サイズ:', video.videoWidth);
-        requestAnimationFrame(tick);
-      }).catch(err => {
-        console.error('play失敗:', err);
-        alert('カメラ再生失敗: ' + err.message);
-        setShowQRReader(false);
-      });
-    })
-    .catch(err => {
-      console.error('カメラアクセス失敗:', err);
-      alert('カメラアクセス失敗: ' + err.message);
-      setShowQRReader(false);
-    });
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    };
-  }, [showQRReader, tick]);
-
-  // tick関数
-  const tick = useCallback(() => {
-    // ... QR読み取り処理 ...
-  }, []);
-
-  // --- ここから追加 ---
-  useEffect(() => {
-    if (!showQRReader) return;
-
-    let stream = null;
-
-    navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      } 
-    })
-    .then(s => {
-      stream = s;
-      const video = videoRef.current;
-      if (!video) return;
-
-      video.srcObject = stream;
-      video.play().then(() => {
-        console.log('カメラ開始！サイズ:', video.videoWidth);
-        requestAnimationFrame(tick); // useCallback済の最新tick
-      }).catch(err => {
-        console.error('play失敗:', err);
-        alert('カメラ再生失敗: ' + err.message);
-        setShowQRReader(false);
-      });
-    })
-    .catch(err => {
-      console.error('カメラアクセス失敗:', err);
-      alert('カメラアクセス失敗: ' + err.message);
-      setShowQRReader(false);
-    });
-
-    // クリーンアップ
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    };
-  }, [showQRReader, tick]); // showQRReader と tick が変わったら再実行
-  // --- ここまで追加 ---
   
   const toggleFolder = (folderId) => {
     setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
@@ -600,8 +469,6 @@ function App() {
                 </div>
                 <button onClick={() => {changeDeviceId(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>ID変更</button>
                 <button onClick={() => {setShowLoginModal(true); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>ログイン</button>
-                <button onClick={() => {generateQR(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>QR生成</button>
-                <button onClick={() => {startQRReader(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px' }}>QR読取</button>
               </div>
             )}
           </div>
@@ -943,61 +810,6 @@ function App() {
         </ul>
       )}
 
-      {/* QRコード生成モーダル */}
-      {showQRCode && (
-        <div style={{ 
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', 
-          justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
-        }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ margin: '0 0 20px', color: t.dark }}>デバイスID QRコード</h3>
-            <canvas ref={qrCanvasRef} style={{ width: '240px', height: '240px', margin: '0 auto 20px' }} />
-            <p style={{ margin: '10px 0', fontSize: '14px', color: t.dark }}>カメラで読み取って共有！</p>
-            <button onClick={() => setShowQRCode(false)} style={{ 
-              background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' 
-            }}>
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* QR読み取りモーダル */}
-      {showQRReader && (
-        <div style={{ 
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-          background: '#000', display: 'flex', alignItems: 'center', 
-          justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
-        }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '400px', aspectRatio: '4/3' }}>
-            <video 
-              ref={videoRef} 
-              playsInline 
-              autoPlay 
-              muted
-              style={{ 
-                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
-                objectFit: 'cover', borderRadius: '16px', zIndex: 1 
-              }} 
-            />
-            <canvas 
-              ref={canvasRef} 
-              style={{ 
-                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
-                borderRadius: '16px', zIndex: 2, background: 'transparent'
-              }} 
-            />
-          </div>
-          <button onClick={() => {
-            setShowQRReader(false);
-            videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
-          }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
-            キャンセル
-          </button>
-        </div>
-      )}
-
       {/* ログイン */}
       {showLoginModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,182,193,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -1005,7 +817,6 @@ function App() {
             <h3 style={{ color: t.dark, textAlign: 'center' }}>ログイン方法</h3>
             <input type="text" value={loginInputId} onChange={(e) => setLoginInputId(e.target.value)} placeholder="デバイスIDを入力" style={{ width: '100%', padding: '12px', border: `2px solid ${t.main}`, borderRadius: '14px', marginBottom: '10px' }} />
             <button onClick={loginWithId} style={{ width: '100%', padding: '12px', background: t.main, color: 'white', borderRadius: '25px', marginBottom: '10px' }}>IDでログイン</button>
-            <button onClick={() => { setShowLoginModal(false); startQRReader(); }} style={{ width: '100%', padding: '12px', background: t.main, color: 'white', borderRadius: '25px', marginBottom: '10px' }}>QRでログイン</button>
             <button onClick={() => setShowLoginModal(false)} style={{ width: '100%', padding: '12px', background: '#ccc', color: 'white', borderRadius: '25px' }}>キャンセル</button>
           </div>
         </div>
@@ -1021,7 +832,7 @@ function App() {
               <strong>・Undo/Redo</strong>: 編集中に Ctrl+Z / Ctrl+Y<br/>
               <strong>・検索</strong>: 文字 / 日付 / フォルダ<br/>
               <strong>・共有</strong>: 詳細 → 共有 → URLコピー<br/>
-              <strong>・ログイン</strong>: ID入力 or QRスキャン<br/><br/>
+              <strong>・ログイン</strong>: ID入力 <br/><br/>
               
               <strong style={{ color: '#d32f2f' }}>【重要】プライベートモードについて</strong><br/>
               シークレットモードやプライベートブラウジングだと<br/>
