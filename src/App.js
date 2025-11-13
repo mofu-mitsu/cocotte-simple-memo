@@ -361,18 +361,31 @@ function App() {
     }, 100);
   };
 
-  // QR読み取り
+  // モーダル表示時に body スクロール禁止
+  useEffect(() => {
+    if (selectedMemo || showQRCode || showQRReader || showLoginModal || showHelp) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedMemo, showQRCode, showQRReader, showLoginModal, showHelp]);
+
+  // QR読み取り（視覚フィードバック追加 + 高精度）
   const startQRReader = () => {
     setShowQRReader(true);
     navigator.mediaDevices.getUserMedia({ 
       video: { 
         facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       } 
     })
     .then(stream => {
       videoRef.current.srcObject = stream;
+      videoRef.current.setAttribute('playsinline', true); // iOS対応
       videoRef.current.play();
       requestAnimationFrame(tick);
     })
@@ -381,25 +394,44 @@ function App() {
       setShowQRReader(false);
     });
   };
-  
+
   const tick = () => {
     if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       if (showQRReader) requestAnimationFrame(tick);
       return;
     }
-  
+
     const video = videoRef.current;
-    canvasRef.current.width = video.videoWidth;
-    canvasRef.current.height = video.videoHeight;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvasRef.current.width, canvasRef.current.height);
-    const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
       inversionAttempts: "attemptBoth"
     });
-  
+
     if (code) {
+      // 検出時に赤枠描画
+      ctx.strokeStyle = '#ff4081';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(
+        code.location.topLeftCorner.x,
+        code.location.topLeftCorner.y,
+        code.location.bottomRightCorner.x - code.location.topLeftCorner.x,
+        code.location.bottomRightCorner.y - code.location.topLeftCorner.y
+      );
+      videoRef.current.style.display = 'none'; // 枠が見えるように
+      canvas.style.display = 'block';
+      canvas.style.position = 'absolute';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.width = '100%';
+      canvas.style.maxWidth = '400px';
+      canvas.style.borderRadius = '16px';
+
       const cleanId = code.data.replace(/\s/g, '');
       localStorage.setItem('deviceId', cleanId);
       setDeviceId(cleanId);
@@ -409,10 +441,9 @@ function App() {
       alert('QR読み取り成功！');
       videoRef.current.srcObject.getTracks().forEach(t => t.stop());
     } else {
-      setTimeout(() => requestAnimationFrame(tick), 150);
+      requestAnimationFrame(tick); // 確実にループ
     }
   };
-
   const toggleFolder = (folderId) => {
     setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
   };
@@ -770,13 +801,17 @@ function App() {
         <div style={{ 
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
           background: '#000', display: 'flex', alignItems: 'center', 
-          justifyContent: 'center', zIndex: 2000, flexDirection: 'column'
+          justifyContent: 'center', zIndex: 2000, flexDirection: 'column', padding: '20px'
         }}>
-          <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px' }} />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+            <video ref={videoRef} style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', display: 'block' }} />
+            <canvas ref={canvasRef} style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '100%', borderRadius: '16px' }} />
+          </div>
           <button onClick={() => {
             setShowQRReader(false);
             videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+            canvasRef.current.style.display = 'none';
+            videoRef.current.style.display = 'block';
           }} style={{ marginTop: '20px', background: '#d32f2f', color: 'white', padding: '12px 24px', borderRadius: '30px' }}>
             キャンセル
           </button>
@@ -824,7 +859,7 @@ function App() {
         </div>
       )}
 
-      {/* メモ詳細モーダル */}
+      {/* メモ詳細モーダル（ボタン上固定 + スクロール最適化） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
@@ -843,7 +878,7 @@ function App() {
           <div style={{
             background: 'white',
             borderRadius: '32px',
-            padding: '30px 20px',
+            padding: '24px 20px',
             width: '100%',
             maxWidth: '560px',
             minWidth: '280px',
@@ -854,13 +889,28 @@ function App() {
             boxSizing: 'border-box',
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            margin: '0 auto'
+            margin: '0 auto',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { display: none !important; }
             `}</style>
-      
-            <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
+
+            {/* 閉じるボタン（上固定） */}
+            <button onClick={() => setSelectedMemo(null)} style={{ 
+              alignSelf: 'flex-end', 
+              background: '#999', 
+              color: 'white', 
+              padding: '8px 16px', 
+              borderRadius: '20px', 
+              fontSize: '14px',
+              marginBottom: '12px'
+            }}>
+              ✕ 閉じる
+            </button>
+
+            <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 18px', fontSize: '22px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
