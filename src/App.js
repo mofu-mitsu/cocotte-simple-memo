@@ -541,14 +541,21 @@ function App() {
         </div>
       </div>
 
-      {/* デバイスID表示（改行版） */}
+      {/* デバイスID表示（空白なしコピー機能付き！！！） */}
       <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
-        <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
-          {deviceId.slice(0, 19)}<br/>
-          {deviceId.slice(19)}
-        </p>
-        <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑スクショして保存推奨！</p>
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all', lineHeight: '1.6' }}>
+            {deviceId}
+          </p>
+          <button onClick={() => {
+            navigator.clipboard.writeText(deviceId);
+            alert('デバイスIDをコピーしたよ！（空白なし）');
+          }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: t.main, color: 'white', border: 'none', padding: '6px 10px', borderRadius: '8px', fontSize: '12px' }}>
+            コピー
+          </button>
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで空白なしでコピーできるよ！</p>
       </div>
 
       {/* QRコード表示 */}
@@ -793,37 +800,55 @@ function App() {
   
       {/* メモ詳細（マジで完全中央！！！） */}
       {selectedMemo && (
-        <div style={{
+        <div style={{ 
           position: 'fixed',
           inset: 0,
           background: 'rgba(255,182,193,0.95)',
-          display: 'grid',
-          placeItems: 'center', // ← flexより安定して中央揃え
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',
+          padding: '20px',              // ← 上下左右均等に余白！
           boxSizing: 'border-box',
+          overflow: 'hidden',           // ← 親は隠す！
           overscrollBehavior: 'none',
-          touchAction: 'pan-y',
+          touchAction: 'pan-y'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: 'min(92%, 600px)', // ← 横幅を%指定にして中央バランス取る
-            maxHeight: '94vh',
-            overflowY: 'auto',
+            width: '100%',
+            maxWidth: '600px',
+            minWidth: '280px',
+            maxHeight: '100%',
+            overflowY: 'auto',            // ← 子だけスクロール！
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
+            // ★最強のスクロールバー完全非表示（全ブラウザ対応！！！）
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            margin: '0 auto', // ← flex誤差を防ぐ
-            transform: 'translateX(0)', // ← リセット
+            // iOS Safari でも絶対隠す！
+            WebkitOverflowScrolling: 'touch',
+            // スクロールバーの幅分も補正！
+            paddingRight: '20px',
+            marginRight: '-20px'
           }}>
+            {/* ★これが最重要！！！全ブラウザでスクロールバー完全消去！！！ */}
             <style jsx>{`
-              div::-webkit-scrollbar { display: none; }
+              div { 
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+              div::-webkit-scrollbar { 
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+              }
             `}</style>
       
+            {/* 中身全部同じ！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
