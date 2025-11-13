@@ -788,8 +788,8 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',
-          padding: 0
+          padding: 0,
+          overflow: 'hidden'  // ← これが最重要！！！hiddenに変更！！
         }}>
           <div style={{
             background: 'white',
@@ -799,12 +799,20 @@ function App() {
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '94vh',
-            overflowY: 'auto',
+            overflowY: 'auto',   // ← スクロールは子要素に移動！！
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            margin: '20px auto',
+            margin: '20px',
             position: 'relative',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            // ↓ これでスマホでも絶対中央！！
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
           }}>
+            <style jsx>{`
+              div::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
             {/* 中身は全部同じでOK！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
