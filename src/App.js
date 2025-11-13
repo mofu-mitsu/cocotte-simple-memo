@@ -407,13 +407,24 @@ function App() {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+
+    // 基本チェック
+    if (!video || !canvas || video.readyState < video.HAVE_ENOUGH_DATA) {
       requestAnimationFrame(tick);
       return;
     }
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    // ジェミの指摘：videoWidthが0なら待機
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.log('ビデオサイズ待ち...'); // デバッグ
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    // 正しいサイズでcanvas設定
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -423,16 +434,18 @@ function App() {
     });
 
     if (code) {
-      console.log('QR検出成功！データ:', code.data); // デバッグ
+      console.log('QR検出成功！データ:', code.data);
       // 赤枠描画
       ctx.strokeStyle = '#ff4081';
-      ctx.lineWidth = Math.max(4, canvas.width / 100);
+      ctx.lineWidth = Math.max(5, canvas.width / 80);
       const loc = code.location;
-      ctx.strokeRect(
-        loc.topLeftCorner.x, loc.topLeftCorner.y,
-        loc.bottomRightCorner.x - loc.topLeftCorner.x,
-        loc.bottomRightCorner.y - loc.topLeftCorner.y
-      );
+      ctx.beginPath();
+      ctx.moveTo(loc.topLeftCorner.x, loc.topLeftCorner.y);
+      ctx.lineTo(loc.topRightCorner.x, loc.topRightCorner.y);
+      ctx.lineTo(loc.bottomRightCorner.x, loc.bottomRightCorner.y);
+      ctx.lineTo(loc.bottomLeftCorner.x, loc.bottomLeftCorner.y);
+      ctx.closePath();
+      ctx.stroke();
 
       const cleanId = code.data.trim();
       localStorage.setItem('deviceId', cleanId);
@@ -868,6 +881,9 @@ function App() {
           <div style={{ position: 'relative', width: '100%', maxWidth: '400px', aspectRatio: '4/3' }}>
             <video 
               ref={videoRef} 
+              playsInline 
+              autoPlay 
+              muted
               style={{ 
                 position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
                 objectFit: 'cover', borderRadius: '16px', zIndex: 1 
