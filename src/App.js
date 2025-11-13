@@ -789,31 +789,42 @@ function App() {
           justifyContent: 'center',
           zIndex: 1000,
           padding: 0,
-          overflow: 'hidden'  // ← これが最重要！！！hiddenに変更！！
+          margin: 0,
+          overflow: 'hidden',           // ← 横も縦も隠す！
+          overscrollBehavior: 'none',   // ← スクロールの跳ね返り防止！
+          touchAction: 'pan-y'          // ← スマホで横スワイプ禁止！
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
-            padding: '34px 20px',
+            padding: '34px 24px',
             width: '100%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '94vh',
-            overflowY: 'auto',   // ← スクロールは子要素に移動！！
+            overflowY: 'auto',            // ← 縦だけスクロール！
+            overflowX: 'hidden',          // ← 横は完全禁止！
             boxShadow: `0 30px 80px ${t.dark}aa`,
             margin: '20px',
             position: 'relative',
             boxSizing: 'border-box',
-            // ↓ これでスマホでも絶対中央！！
+            // スクロールバー完全非表示
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none'
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch'
           }}>
+            {/* スクロールバー非表示（全ブラウザ対応） */}
             <style jsx>{`
               div::-webkit-scrollbar {
                 display: none;
               }
+              div {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
             `}</style>
-            {/* 中身は全部同じでOK！！ */}
+      
+            {/* 中身全部同じ！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
