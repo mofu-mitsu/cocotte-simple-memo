@@ -857,23 +857,23 @@ function App() {
           position: 'fixed',
           top: 0,
           left: 0,
-          width: '100vw',           // ← vwに変更！！
-          height: '100vh',          // ← vhに変更！！
+          width: '100vw',
+          height: '100vh',
           background: 'rgba(255,182,193,0.95)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
           overflowY: 'auto',
-          padding: 0,               // ← 0！！
-          margin: 0,                // ← 0！！
+          padding: 0,
+          margin: 0,
           boxSizing: 'border-box'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',             // ← 90%！！
+            width: '90%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
@@ -883,7 +883,7 @@ function App() {
             boxSizing: 'border-box',
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            margin: 'auto'            // ← これが最重要！！！
+            margin: 'auto'
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { 
@@ -891,7 +891,6 @@ function App() {
               }
             `}</style>
       
-            {/* 中身全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
