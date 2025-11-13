@@ -785,7 +785,6 @@ function App() {
               iPhone: 共有ボタン → 「ホーム画面に追加」<br/>
               Android: メニュー → 「ホーム画面に追加」<br/>
               → ブラウザ開かずにワンタップで起動できる！<br/>
-              オフラインでも使えるし通知も来るよ✨
             </p>
             <button onClick={() => setShowHelp(false)} style={{ background: t.main, color: 'white', padding: '14px 28px', borderRadius: '30px', margin: '20px auto 0', display: 'block', fontWeight: 'bold' }}>閉じる</button>
           </div>
