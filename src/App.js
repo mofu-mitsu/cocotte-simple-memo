@@ -560,22 +560,74 @@ function App() {
         <p style={{ margin: '8px 0 0', fontSize: '13px', color: t.dark }}>↑コピーボタンで安全にコピー！</p>
       </div>
 
-      {/* QRコード表示 */}
-      {showQRCode && (
-        <div style={{ margin: '20px 0', textAlign: 'center', padding: '20px', background: t.light, borderRadius: '20px' }}>
-          <canvas ref={qrCanvasRef} style={{ border: `4px solid ${t.main}`, borderRadius: '20px', boxShadow: `0 10px 30px ${t.dark}44` }} />
-          <button onClick={() => setShowQRCode(false)} style={{ marginTop: '15px', background: t.main, color: 'white', padding: '10px 20px', borderRadius: '30px', cursor: 'pointer' }}>閉じる</button>
-        </div>
-      )}
-
-      {/* QRリーダー */}
-      {showQRReader && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.9)', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <video ref={videoRef} style={{ width: '90%', maxWidth: '400px', borderRadius: '20px', border: `4px solid ${t.main}` }} />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <button onClick={() => { setShowQRReader(false); if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t => t.stop()); }} style={{ marginTop: '20px', background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px' }}>キャンセル</button>
-        </div>
-      )}
+      // QR生成（超高精度＋空白除去）
+      const generateQR = () => {
+        setShowQRCode(true);
+        setTimeout(() => {
+          if (qrCanvasRef.current) {
+            const cleanId = deviceId.replace(/\s/g, '');  // ← 全空白除去！！
+            QRCode.toCanvas(qrCanvasRef.current, cleanId, { 
+              width: 256, 
+              errorCorrectionLevel: 'H',
+              margin: 2,
+              color: { dark: '#ff4081', light: '#ffffff' }
+            }, (error) => {
+              if (error) console.error(error);
+            });
+          }
+        }, 100);
+      };
+      
+      // QR読み取り（超安定版）
+      const startQRReader = () => {
+        setShowQRReader(true);
+        navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        })
+        .then(stream => {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          requestAnimationFrame(tick);
+        })
+        .catch(err => {
+          alert('カメラアクセス失敗: ' + err.message);
+          setShowQRReader(false);
+        });
+      };
+      
+      const tick = () => {
+        if (!showQRReader || !videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
+          requestAnimationFrame(tick);
+          return;
+        }
+      
+        const video = videoRef.current;
+        canvasRef.current.width = video.videoWidth;
+        canvasRef.current.height = video.videoHeight;
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvasRef.current.width, canvasRef.current.height);
+        const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+        
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "attemptBoth"
+        });
+      
+        if (code) {
+          const cleanId = code.data.replace(/\s/g, '');
+          localStorage.setItem('deviceId', cleanId);
+          setDeviceId(cleanId);
+          setShowQRReader(false);
+          fetchFolders();
+          fetchMemos();
+          video.srcObject.getTracks().forEach(t => t.stop());
+        } else {
+          requestAnimationFrame(tick);
+        }
+      };
 
 {/* メモ入力エリア */}
 <div style={{ 
@@ -799,30 +851,29 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* メモ詳細（神復元版！！！昔の完璧な状態に完全戻し！！！） */}
+      {/* メモ詳細（宇宙最終版！！！白枠ピンク縁も完全中央！！！） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
+          width: '100vw',           // ← vwに変更！！
+          height: '100vh',          // ← vhに変更！！
           background: 'rgba(255,182,193,0.95)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
           overflowY: 'auto',
-          padding: 0,               // ← ここも0に！！！
-          boxSizing: 'border-box',
-          overscrollBehavior: 'none'
+          padding: 0,               // ← 0！！
+          margin: 0,                // ← 0！！
+          boxSizing: 'border-box'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',
+            width: '90%',             // ← 90%！！
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
@@ -831,14 +882,15 @@ function App() {
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none'
+            scrollbarWidth: 'none',
+            margin: 'auto'            // ← これが最重要！！！
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { 
                 display: none !important;
-                width: 0 !important;
               }
             `}</style>
+      
             {/* 中身全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
