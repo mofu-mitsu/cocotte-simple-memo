@@ -407,6 +407,9 @@ function App() {
   }, [showQRReader, tick]); // showQRReader と tick が変わったら再実行
   // --- ここまで追加 ---
 
+  const startQRReader = () => {
+    setShowQRReader(true);
+  };
   const tick = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -944,7 +947,9 @@ function App() {
             <h3 style={{ margin: '0 0 20px', color: t.dark }}>デバイスID QRコード</h3>
             <canvas ref={qrCanvasRef} style={{ width: '240px', height: '240px', margin: '0 auto 20px' }} />
             <p style={{ margin: '10px 0', fontSize: '14px', color: t.dark }}>カメラで読み取って共有！</p>
-            <button onClick={() => setShowQRCode(false)} Yepstyle={{ background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' }}>
+            <button onClick={() => setShowQRCode(false)} style={{ 
+              background: t.main, color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold' 
+            }}>
               閉じる
             </button>
           </div>
