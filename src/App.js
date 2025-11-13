@@ -796,7 +796,7 @@ function App() {
         </div>
       )}
 
-      {/* メモ詳細（神復元版！！！昔のまともな状態＋完全中央！！！） */}
+      {/* メモ詳細（最終最終最終最終版！！！内枠も完全中央！！！） */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
@@ -809,31 +809,39 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          overflowY: 'auto',      // ← 昔と同じ！！親にスクロール！
-          padding: '20px 0',      // ← 昔と同じ！！左右パディングなし！
-          boxSizing: 'border-box'
+          padding: '20px 0',
+          boxSizing: 'border-box',
+          overflow: 'hidden'  // ← ここ変更！！！親はhidden！
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',           // ← 昔と同じ90%！！！
+            width: '90%',
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
-            overflowY: 'auto',
+            overflowY: 'auto',           // ← 子に移動！！！
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
-            // スクロールバー非表示（昔と同じ）
+            // ★最強スクロールバー完全非表示＋幅補正！！！
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none'
+            scrollbarWidth: 'none',
+            paddingRight: '20px',        // ← スクロールバー分の幅を帳消し
+            marginRight: '-20px'
           }}>
+            {/* ★これが最重要！！！iOSでも絶対隠す！！！ */}
             <style jsx>{`
-              div::-webkit-scrollbar { display: none; }
+              div::-webkit-scrollbar {
+                display: none !important;
+                width: 0 !important;
+                background: transparent !important;
+              }
+              div { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
       
-            {/* 中身全部昔のまま！！！ */}
+            {/* 中身全部そのまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
