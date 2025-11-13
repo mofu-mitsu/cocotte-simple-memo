@@ -809,39 +809,36 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px 0',
+          overflowY: 'auto',      // ← 昔と同じ！！親にauto！
+          padding: '20px 0',      // ← 昔と同じ！！左右0！
           boxSizing: 'border-box',
-          overflow: 'hidden'  // ← ここ変更！！！親はhidden！
+          overscrollBehavior: 'none'
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '90%',
+            width: '90%',           // ← 昔と同じ90%！！！
             maxWidth: '600px',
             minWidth: '280px',
             maxHeight: '95vh',
-            overflowY: 'auto',           // ← 子に移動！！！
+            overflowY: 'auto',      // ← 子にもauto（長文対応）
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
             boxSizing: 'border-box',
-            // ★最強スクロールバー完全非表示＋幅補正！！！
+            // ★スクロールバー非表示だけ！！補正なし！！
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-            paddingRight: '20px',        // ← スクロールバー分の幅を帳消し
-            marginRight: '-20px'
+            scrollbarWidth: 'none'
           }}>
-            {/* ★これが最重要！！！iOSでも絶対隠す！！！ */}
             <style jsx>{`
-              div::-webkit-scrollbar {
+              div::-webkit-scrollbar { 
                 display: none !important;
                 width: 0 !important;
                 background: transparent !important;
               }
-              div { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
       
-            {/* 中身全部そのまま！！！ */}
+            {/* 中身全部昔のまま！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
