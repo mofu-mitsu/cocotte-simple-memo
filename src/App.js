@@ -793,47 +793,37 @@ function App() {
   
       {/* メモ詳細（マジで完全中央！！！） */}
       {selectedMemo && (
-        <div style={{ 
+        <div style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,
           background: 'rgba(255,182,193,0.95)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'grid',
+          placeItems: 'center', // ← flexより安定して中央揃え
           zIndex: 1000,
-          padding: 0,
-          margin: 0,
-          overflow: 'hidden',
+          overflowY: 'auto',
+          boxSizing: 'border-box',
           overscrollBehavior: 'none',
-          touchAction: 'pan-y'
+          touchAction: 'pan-y',
         }}>
           <div style={{
             background: 'white',
             borderRadius: '32px',
             padding: '34px 24px',
-            width: '100%',
-            maxWidth: '600px',
-            minWidth: '280px',
+            width: 'min(92%, 600px)', // ← 横幅を%指定にして中央バランス取る
             maxHeight: '94vh',
             overflowY: 'auto',
             overflowX: 'hidden',
             boxShadow: `0 30px 80px ${t.dark}aa`,
-            margin: '20px',
-            position: 'relative',
             boxSizing: 'border-box',
             msOverflowStyle: 'none',
             scrollbarWidth: 'none',
-            // ★ここが最強！！！強制的に左に10pxずらす！！
-            transform: 'translateX(-10px)'
+            margin: '0 auto', // ← flex誤差を防ぐ
+            transform: 'translateX(0)', // ← リセット
           }}>
             <style jsx>{`
               div::-webkit-scrollbar { display: none; }
             `}</style>
       
-            {/* 中身全部同じ！！！ */}
             <h3 style={{ color: t.dark, textAlign: 'center', marginBottom: '22px', fontSize: '23px' }}>
               {highlightText(selectedMemo.text.split('\n')[0] || '（無題）')}
             </h3>
