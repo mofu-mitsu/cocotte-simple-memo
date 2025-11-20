@@ -6,7 +6,7 @@
   "display": "standalone",
   "background_color": "#fff5f8",
   "theme_color": "#ff80ab",
-  "version": "1.0.1",   ← これ追加！！！
+  "version": "1.0.1",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-192.png.PNG", "sizes": "192x192", "type": "image/png" },
