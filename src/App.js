@@ -849,9 +849,8 @@ function App() {
               （PWA化しても念のため保存しとくと安心）<br/><br/>
       
               <strong style={{ color: '#ff4081' }}>【超便利】PWAでアプリ化しよう！</strong><br/>
-              iPhone: 共有ボタン → 「ホーム画面に追加」<br/>
-              Android: メニュー → 「ホーム画面に追加」<br/>
-              → ブラウザ開かずにワンタップで起動できる！<br/>
+              Safari（iPhone）やChromeなど（Android）からならホーム画面に追加すると<br/>
+              → ブラウザ開かずにワンタップで起動できるよ！<br/>
             </p>
             <button onClick={() => setShowHelp(false)} style={{ background: t.main, color: 'white', padding: '14px 28px', borderRadius: '30px', margin: '20px auto 0', display: 'block', fontWeight: 'bold' }}>閉じる</button>
           </div>
