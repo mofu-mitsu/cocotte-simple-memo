@@ -381,15 +381,19 @@ function App() {
     else fetchMemos();
   };
 
+  // loginWithId と changeDeviceId もバリデーション強化
   const loginWithId = () => {
-    if (loginInputId.trim()) {
-      localStorage.setItem('deviceId', loginInputId.trim());
-      setDeviceId(loginInputId.trim());
-      setShowLoginModal(false);
-      setLoginInputId('');
-      fetchFolders();
-      fetchMemos();
+    const input = loginInputId.trim();
+    if (!input) return alert('IDを入力してね！');
+    if (!isValidUUID(input)) {
+      return alert('不正なIDです！コピペミスかも？');
     }
+    localStorage.setItem('deviceId', input);
+    setDeviceId(input);
+    setShowLoginModal(false);
+    setLoginInputId('');
+    fetchFolders();
+    fetchMemos();
   };
 
   const charCount = selectedMemo ? selectedMemo.text.length : 0;
