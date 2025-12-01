@@ -179,22 +179,6 @@ function App() {
     else setFolders(data || []);
   };
 
-  const createFolder = async () => {
-    if (!newFolderName.trim() || !deviceId) return;
-    const { data, error } = await supabase
-      .from('folders')
-      .insert([{ name: newFolderName.trim(), device_id: deviceId }])
-      .select();
-    if (error) {
-      console.error('Error creating folder:', error);
-      alert('フォルダ作成失敗: ' + error.message);
-    } else {
-      setNewFolderName('');
-      if (data && data[0]) setFolders(prev => [...prev, data[0]]);
-      fetchMemos();
-    }
-  };
-
   const deleteFolder = async (folderId) => {
     if (!isSelectMode) return;
     if (!confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
