@@ -80,11 +80,13 @@ function App() {
     return regex.test(str);
   };
   
-  // createFolder（完全修正版！！！）
+    // createFolder（完全修正版！！！）
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
+  
+    // deviceIdが不正ならガード
     if (!deviceId || !isValidUUID(deviceId)) {
-      alert('デバイスIDが不正です！再ログインしてください');
+      alert('デバイスIDが壊れてます！アプリをリロードするか、ログインし直してください！');
       return;
     }
   
@@ -92,7 +94,7 @@ function App() {
       .from('folders')
       .insert([{ 
         name: newFolderName.trim(), 
-        device_id: deviceId   // ← 絶対UUID確定してるから安心
+        device_id: deviceId 
       }])
       .select();
   
@@ -357,14 +359,20 @@ function App() {
 
   const changeDeviceId = () => {
     const newId = prompt('デバイスIDを入力（共有用）:');
-    if (newId) {
-      localStorage.setItem('deviceId', newId);
-      setDeviceId(newId);
-      setSelectedFolderId('');
-      setFolderSearchId('');
-      fetchFolders();
-      fetchMemos();
+    if (!newId) return;
+  
+    const trimmed = newId.trim();
+    if (!isValidUUID(trimmed)) {
+      alert('不正なIDです！空白が入ってないか確認してね！');
+      return;
     }
+  
+    localStorage.setItem('deviceId', trimmed);
+    setDeviceId(trimmed);
+    setSelectedFolderId('');
+    setFolderSearchId('');
+    fetchFolders();
+    fetchMemos();
   };
   
   const toggleFolder = (folderId) => {
