@@ -64,16 +64,47 @@ function App() {
   };
   const t = themeColors[theme];
 
-  // デバイスID初期化
+  // deviceId初期化（ここを強化！！！）
   useEffect(() => {
     let id = localStorage.getItem('deviceId');
-    if (!id) {
+    if (!id || id.trim() === '' || !isValidUUID(id)) {
       id = uuidv4();
       localStorage.setItem('deviceId', id);
     }
     setDeviceId(id);
   }, []);
 
+  // UUID有効判定関数（追加！！！）
+  const isValidUUID = (str) => {
+    const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return regex.test(str);
+  };
+  
+  // createFolder（完全修正版！！！）
+  const createFolder = async () => {
+    if (!newFolderName.trim()) return;
+    if (!deviceId || !isValidUUID(deviceId)) {
+      alert('デバイスIDが不正です！再ログインしてください');
+      return;
+    }
+  
+    const { data, error } = await supabase
+      .from('folders')
+      .insert([{ 
+        name: newFolderName.trim(), 
+        device_id: deviceId   // ← 絶対UUID確定してるから安心
+      }])
+      .select();
+  
+    if (error) {
+      console.error('Error creating folder:', error);
+      alert('フォルダ作成失敗: ' + error.message);
+    } else {
+      setNewFolderName('');
+      if (data?.[0]) setFolders(prev => [...prev, data[0]]);
+      fetchMemos();
+    }
+  };
   // データ取得
   useEffect(() => {
     if (deviceId) {
