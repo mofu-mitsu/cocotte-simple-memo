@@ -71,10 +71,15 @@ function App() {
   // deviceId初期化
   useEffect(() => {
     let id = localStorage.getItem('deviceId');
-    if (!id || id.trim() === '' || !isValidUUID(id)) {
+    if (!id || id.trim() === '') {
       id = uuidv4();
       localStorage.setItem('deviceId', id);
     }
+    // ← ここ削除！（UUIDじゃなくても通す！！！）
+    // else if (!isValidUUID(id)) {
+    //   id = uuidv4();
+    //   localStorage.setItem('deviceId', id);
+    // }
     setDeviceId(id);
   }, []);
   
