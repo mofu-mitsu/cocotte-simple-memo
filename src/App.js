@@ -33,20 +33,18 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [theme, setTheme] = useState('pink');
   const [showMenu, setShowMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(true);
 
   // Undo/Redo 用
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyRef = useRef([]);
   const indexRef = useRef(-1);
+  const textareaRef = useRef(null);
 
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { indexRef.current = historyIndex; }, [historyIndex]);
 
-  const textareaRef = useRef(null);
-  
-  const [isMobile, setIsMobile] = useState(true);
-  
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -64,7 +62,13 @@ function App() {
   };
   const t = themeColors[theme];
 
-  // deviceId初期化（ここを強化！！！）
+  // UUID有効判定関数
+  const isValidUUID = (str) => {
+    const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return regex.test(str);
+  };
+
+  // deviceId初期化
   useEffect(() => {
     let id = localStorage.getItem('deviceId');
     if (!id || id.trim() === '' || !isValidUUID(id)) {
@@ -73,14 +77,8 @@ function App() {
     }
     setDeviceId(id);
   }, []);
-
-  // UUID有効判定関数（追加！！！）
-  const isValidUUID = (str) => {
-    const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return regex.test(str);
-  };
   
-    // createFolder（完全修正版！！！）
+  // createFolder（ここが重複の原因だったので1つに統一！）
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
   
@@ -107,6 +105,7 @@ function App() {
       fetchMemos();
     }
   };
+
   // データ取得
   useEffect(() => {
     if (deviceId) {
@@ -406,20 +405,13 @@ function App() {
     else fetchMemos();
   };
 
-  // loginWithId と changeDeviceId もバリデーション強化
   const loginWithId = () => {
-    let input = loginInputId.trim(); // まずtrim
-  
+    let input = loginInputId.trim();
     if (!input) return alert('IDを入力してね！');
-  
-    // ここが最強ポイント！！！コピペミスを自動で救う！！！
-    input = input.replace(/\s/g, ''); // 全部の空白・改行・タブを削除
-    input = input.toLowerCase();      // UUIDは小文字でもOKにする
-  
+    input = input.replace(/\s/g, '').toLowerCase();
     if (!isValidUUID(input)) {
-      return alert('不正なIDです！\n\nコピペしたときに余計な空白や改行が入ってないか確認してね！\n（自動で消そうとしたけどダメだったみたい…）');
+      return alert('不正なIDです！\n\nコピペしたときに余計な空白や改行が入ってないか確認してね！');
     }
-  
     localStorage.setItem('deviceId', input);
     setDeviceId(input);
     setShowLoginModal(false);
@@ -428,6 +420,7 @@ function App() {
     fetchMemos();
     alert('ログイン成功！データが同期されたよ✨');
   };
+
   const charCount = selectedMemo ? selectedMemo.text.length : 0;
 
   return (
@@ -716,117 +709,114 @@ function App() {
                                   <strong style={{ marginLeft: '40px', flex: 1, fontSize: '16px' }}>
                                     {getTitle(memo.text)}
                                   </strong>
-                                    </li>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </ul>
-                          )}
-                        </Droppable>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
                       )}
-                    </div>
-                  );
-                })}
-          
-                {/* 未分類 */}
-                <div>
-                  <div onClick={() => setIsOpenUncategorized(!isOpenUncategorized)} style={{ background: t.light, padding: '10px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', color: t.dark, boxShadow: `0 3px 10px ${t.dark}26` }}>
-                    未分類 ({memos.filter(m => !m.folder_id).length})
-                  </div>
-          
-                  {isOpenUncategorized && (
-                    <Droppable droppableId="uncategorized">
-                      {(provided) => (
-                        <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
-                          {memos.filter(m => !m.folder_id).map((memo, index) => (
-                            <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
-                              {(provided, snapshot) => (
-    <li
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            onClick={() => {
-                              if (!isSelectMode) setSelectedMemo(memo);
-                            }}
-                            style={{
-                              ...provided.draggableProps.style,
-                              backgroundColor: memo.color,
-                              padding: '12px',
-                              margin: '6px 0',
-                              borderRadius: '12px',
-                              cursor: isSelectMode ? 'default' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              color: t.dark,
-                              boxShadow: snapshot.isDragging 
-                                ? `0 12px 28px ${t.main}77` 
-                                : '0 2px 8px rgba(0,0,0,0.1)',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              transition: snapshot.isDragging ? 'none' : 'all 0.25s ease',
-                              // ← transform 上書き削除！！
-                            }}
-                          >
-                            {/* ドラッグハンドル（変更なし） */}
-                            <div
-                              {...provided.dragHandleProps}
+                    </Droppable>
+                  )}
+                </div>
+              );
+            })}
+      
+            {/* 未分類 */}
+            <div>
+              <div onClick={() => setIsOpenUncategorized(!isOpenUncategorized)} style={{ background: t.light, padding: '10px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', color: t.dark, boxShadow: `0 3px 10px ${t.dark}26` }}>
+                未分類 ({memos.filter(m => !m.folder_id).length})
+              </div>
+      
+              {isOpenUncategorized && (
+                <Droppable droppableId="uncategorized">
+                  {(provided) => (
+                    <ul {...provided.droppableProps} ref={provided.innerRef} style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
+                      {memos.filter(m => !m.folder_id).map((memo, index) => (
+                        <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
+                          {(provided, snapshot) => (
+                            <li
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              onClick={() => {
+                                if (!isSelectMode) setSelectedMemo(memo);
+                              }}
                               style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                width: '36px',
-                                height: '100%',
-                                background: snapshot.isDragging 
-                                  ? `linear-gradient(90deg, ${t.main}88, transparent)` 
-                                  : `linear-gradient(90deg, ${t.main}44, transparent)`,
+                                ...provided.draggableProps.style,
+                                backgroundColor: memo.color,
+                                padding: '12px',
+                                margin: '6px 0',
+                                borderRadius: '12px',
+                                cursor: isSelectMode ? 'default' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'grab',
-                                opacity: 1,
-                                transition: 'background 0.2s ease',
-                                borderRadius: '12px 0 0 12px',
-                                zIndex: 10,
+                                color: t.dark,
+                                boxShadow: snapshot.isDragging 
+                                  ? `0 12px 28px ${t.main}77` 
+                                  : '0 2px 8px rgba(0,0,0,0.1)',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                transition: snapshot.isDragging ? 'none' : 'all 0.25s ease',
+                                transform: snapshot.isDragging ? provided.draggableProps.style?.transform : 'none',
                               }}
                             >
-                              <div style={{
-                                width: '18px',
-                                height: '36px',
-                                borderRadius: '6px',
-                                background: 
-                                  theme === 'pink' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 5px, ${t.dark} 10px)`
-                                  : theme === 'blue' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 4px, ${t.dark} 8px)`
-                                  : theme === 'green' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 6px, ${t.dark} 12px)`
-                                  : `repeating-linear-gradient(90deg, #bbb 0px, transparent 4px, #bbb 8px)`,
-                                boxShadow: snapshot.isDragging ? `0 0 16px ${t.main}` : 'none',
-                                transition: 'all 0.2s ease',
-                              }} />
-                            </div>
-                          
-                            {/* チェックボックス（選択モード時） */}
-                            {isSelectMode && (
-                              <input
-                                type="checkbox"
-                                checked={selectedMemos.has(memo.id)}
-                                onChange={() => toggleSelectMemo(memo.id)}
-                                onClick={(e) => e.stopPropagation()}
+                              <div
+                                {...provided.dragHandleProps}
                                 style={{
-                                  marginLeft: '40px',  // ← ハンドルの右側
-                                  marginRight: '10px',
-                                  accentColor: t.main
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: 0,
+                                  width: '36px',
+                                  height: '100%',
+                                  background: snapshot.isDragging 
+                                    ? `linear-gradient(90deg, ${t.main}88, transparent)` 
+                                    : `linear-gradient(90deg, ${t.main}44, transparent)`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'grab',
+                                  opacity: 1,
+                                  transition: 'background 0.2s ease',
+                                  borderRadius: '12px 0 0 12px',
+                                  zIndex: 10,
                                 }}
-                              />
-                            )}
-                          
-                            {/* タイトル */}
-                            <strong style={{
-                              marginLeft: isSelectMode ? '0px' : '40px',  // ← 選択モード時はチェックボックスがマージン担当
-                              flex: 1,
-                              fontSize: '16px'
-                            }}>
-                              {getTitle(memo.text)}
-                            </strong>
-                          </li>
+                              >
+                                <div style={{
+                                  width: '18px',
+                                  height: '36px',
+                                  borderRadius: '6px',
+                                  background: 
+                                    theme === 'pink' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 5px, ${t.dark} 10px)`
+                                    : theme === 'blue' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 4px, ${t.dark} 8px)`
+                                    : theme === 'green' ? `repeating-linear-gradient(90deg, ${t.dark} 0px, transparent 6px, ${t.dark} 12px)`
+                                    : `repeating-linear-gradient(90deg, #bbb 0px, transparent 4px, #bbb 8px)`,
+                                  boxShadow: snapshot.isDragging ? `0 0 16px ${t.main}` : 'none',
+                                  transition: 'all 0.2s ease',
+                                }} />
+                              </div>
+                            
+                              {isSelectMode && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedMemos.has(memo.id)}
+                                  onChange={() => toggleSelectMemo(memo.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    marginLeft: '40px',
+                                    marginRight: '10px',
+                                    accentColor: t.main
+                                  }}
+                                />
+                              )}
+                            
+                              <strong style={{
+                                marginLeft: isSelectMode ? '0px' : '40px',
+                                flex: 1,
+                                fontSize: '16px'
+                              }}>
+                                {getTitle(memo.text)}
+                              </strong>
+                            </li>
                           )}
                         </Draggable>
                       ))}
@@ -893,7 +883,7 @@ function App() {
         </div>
       )}
 
-      {/* メモ詳細モーダル（ボタン上固定 + スクロール最適化） */}
+      {/* メモ詳細モーダル */}
       {selectedMemo && (
         <div style={{ 
           position: 'fixed',
@@ -901,7 +891,7 @@ function App() {
           left: 0,
           width: '100vw',
           height: '100vh',
-          background: `${t.main}ee`, // ← ここを動的に！（ピンク固定やめ）
+          background: `${t.main}ee`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -931,7 +921,6 @@ function App() {
               div::-webkit-scrollbar { display: none !important; }
             `}</style>
 
-            {/* 閉じるボタン */}
             <button onClick={() => setSelectedMemo(null)} style={{ 
               alignSelf: 'flex-end', 
               background: '#999', 
