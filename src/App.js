@@ -62,7 +62,7 @@ function App() {
   };
   const t = themeColors[theme];
 
-  // UUID有効判定関数
+  // UUID有効判定関数（警告用）
   const isValidUUID = (str) => {
     const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return regex.test(str);
@@ -71,23 +71,19 @@ function App() {
   // deviceId初期化
   useEffect(() => {
     let id = localStorage.getItem('deviceId');
+    // 空っぽの場合だけ新規作成。変な文字列でも入っていればそれを採用！
     if (!id || id.trim() === '') {
       id = uuidv4();
       localStorage.setItem('deviceId', id);
     }
-    // ← ここ削除！（UUIDじゃなくても通す！！！）
-    // else if (!isValidUUID(id)) {
-    //   id = uuidv4();
-    //   localStorage.setItem('deviceId', id);
-    // }
     setDeviceId(id);
   }, []);
   
-  // createFolder（ここが重複の原因だったので1つに統一！）
+  // createFolder
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
   
-    // deviceIdが不正ならガード
+    // deviceIdが空でなければOKにする（UUIDチェックは外した！）
     if (!deviceId || deviceId.trim() === '') {
       alert('デバイスIDが空です！アプリをリロードしてください！');
       return;
@@ -345,7 +341,7 @@ function App() {
     }
   };
 
-  // changeDeviceIdも同じ！！！
+  // changeDeviceIdも規制緩和！！！
   const changeDeviceId = () => {
     const newId = prompt('新しいデバイスIDを入力してね！（空欄でランダムUUID）:');
     if (newId === null) return;
@@ -354,6 +350,7 @@ function App() {
     if (!newId || newId.trim() === '') {
       finalId = uuidv4();
     } else {
+      // 空白は削除するけど、形式は何でもOKにする！
       finalId = newId.trim().replace(/\s/g, '');
       if (finalId === '') {
         alert('空白だけはダメだよ！');
@@ -368,7 +365,7 @@ function App() {
     fetchFolders();
     fetchMemos();
   
-    // 即時alert！！！
+    // 警告だけ出す！
     if (!isValidUUID(finalId)) {
       alert(`IDを「${finalId}」に変更したよ！\n古い形式でも使えるけど、安定するならUUIDがおすすめ！`);
     } else {
@@ -421,7 +418,7 @@ function App() {
     else fetchMemos();
   };
 
-  // loginWithId（setTimeout削除！即時alertに変更！）
+  // loginWithId も規制緩和！！
   const loginWithId = () => {
     let input = loginInputId.trim();
     if (!input) return alert('IDを入力してね！');
@@ -436,7 +433,7 @@ function App() {
     fetchFolders();
     fetchMemos();
   
-    // 即時alertに変更！！！（setTimeoutが悪だった！！！）
+    // UUIDじゃない場合だけ警告メッセージを出す（ログインはさせる！）
     if (!isValidUUID(cleaned)) {
       alert(`ログインできたよ！✨\n\nでもこのID「${cleaned}」は古い形式だよ～\n今後安定して使うなら、メニューから「ID変更」で新しいUUIDに変えてね！`);
     } else {
