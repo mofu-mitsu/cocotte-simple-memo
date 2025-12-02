@@ -419,29 +419,24 @@ function App() {
     else fetchMemos();
   };
 
+  // loginWithId（setTimeout削除！即時alertに変更！）
   const loginWithId = () => {
     let input = loginInputId.trim();
     if (!input) return alert('IDを入力してね！');
   
-    // ←ここが神！！！旧ユーザー救済モード！！！
-    const cleaned = input.replace(/\s/g, ''); // 空白だけ消す（昔の人は空白なしで入れてるはず）
-  
-    // UUIDじゃなくても通す！！！（でも空はダメ）
+    const cleaned = input.replace(/\s/g, '');
     if (cleaned === '') return alert('IDが空だよ！');
   
-    // とりあえず通してあげる！！！
     localStorage.setItem('deviceId', cleaned);
     setDeviceId(cleaned);
     setShowLoginModal(false);
     setLoginInputId('');
     fetchFolders();
     fetchMemos();
-    
-    // 初回だけ警告出す（優しいだろ？）
+  
+    // 即時alertに変更！！！（setTimeoutが悪だった！！！）
     if (!isValidUUID(cleaned)) {
-      setTimeout(() => {
-        alert(`ログインできたよ！✨\n\nでもこのID「${cleaned}」は古い形式だよ～\n今後安定して使うなら、メニューから「ID変更」で新しいUUIDに変えるのがおすすめ！\n（データはそのまま引き継げるよ）`);
-      }, 500);
+      alert(`ログインできたよ！✨\n\nでもこのID「${cleaned}」は古い形式だよ～\n今後安定して使うなら、メニューから「ID変更」で新しいUUIDに変えてね！`);
     } else {
       alert('ログイン成功！データが同期されたよ✨');
     }
