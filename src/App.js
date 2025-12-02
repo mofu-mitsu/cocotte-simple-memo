@@ -341,23 +341,32 @@ function App() {
   };
 
   const changeDeviceId = () => {
-    const newId = prompt('デバイスIDを入力（共有用）:');
-    if (!newId) return;
+    const newId = prompt('新しいデバイスIDを入力してね！（空欄でランダムUUID）:');
+    if (newId === null) return;
   
-    let cleaned = newId.trim().replace(/\s/g, '').toLowerCase();
-  
-    if (!isValidUUID(cleaned)) {
-      alert('不正なIDです！\n\n空白や改行が入ってないか確認してね！\n（自動で消したけどダメだった…）');
-      return;
+    let finalId;
+    if (!newId || newId.trim() === '') {
+      finalId = uuidv4(); // 空欄なら自動生成
+    } else {
+      finalId = newId.trim().replace(/\s/g, '');
+      if (finalId === '') {
+        alert('空白だけはダメだよ！');
+        return;
+      }
     }
   
-    localStorage.setItem('deviceId', cleaned);
-    setDeviceId(cleaned);
+    localStorage.setItem('deviceId', finalId);
+    setDeviceId(finalId);
     setSelectedFolderId('');
     setFolderSearchId('');
     fetchFolders();
     fetchMemos();
-    alert('IDを変更したよ！データが切り替わった✨');
+    
+    if (!isValidUUID(finalId)) {
+      alert(`IDを「${finalId}」に変更したよ！\n（古い形式でも使えるけど、安定するならUUIDがおすすめ！）`);
+    } else {
+      alert('IDを変更したよ！データが切り替わった✨');
+    }
   };
   
   const toggleFolder = (folderId) => {
@@ -408,17 +417,29 @@ function App() {
   const loginWithId = () => {
     let input = loginInputId.trim();
     if (!input) return alert('IDを入力してね！');
-    input = input.replace(/\s/g, '').toLowerCase();
-    if (!isValidUUID(input)) {
-      return alert('不正なIDです！\n\nコピペしたときに余計な空白や改行が入ってないか確認してね！');
-    }
-    localStorage.setItem('deviceId', input);
-    setDeviceId(input);
+  
+    // ←ここが神！！！旧ユーザー救済モード！！！
+    const cleaned = input.replace(/\s/g, ''); // 空白だけ消す（昔の人は空白なしで入れてるはず）
+  
+    // UUIDじゃなくても通す！！！（でも空はダメ）
+    if (cleaned === '') return alert('IDが空だよ！');
+  
+    // とりあえず通してあげる！！！
+    localStorage.setItem('deviceId', cleaned);
+    setDeviceId(cleaned);
     setShowLoginModal(false);
     setLoginInputId('');
     fetchFolders();
     fetchMemos();
-    alert('ログイン成功！データが同期されたよ✨');
+    
+    // 初回だけ警告出す（優しいだろ？）
+    if (!isValidUUID(cleaned)) {
+      setTimeout(() => {
+        alert(`ログインできたよ！✨\n\nでもこのID「${cleaned}」は古い形式だよ～\n今後安定して使うなら、メニューから「ID変更」で新しいUUIDに変えるのがおすすめ！\n（データはそのまま引き継げるよ）`);
+      }, 500);
+    } else {
+      alert('ログイン成功！データが同期されたよ✨');
+    }
   };
 
   const charCount = selectedMemo ? selectedMemo.text.length : 0;
