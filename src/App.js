@@ -88,8 +88,8 @@ function App() {
     if (!newFolderName.trim()) return;
   
     // deviceIdが不正ならガード
-    if (!deviceId || !isValidUUID(deviceId)) {
-      alert('デバイスIDが壊れてます！アプリをリロードするか、ログインし直してください！');
+    if (!deviceId || deviceId.trim() === '') {
+      alert('デバイスIDが空です！アプリをリロードしてください！');
       return;
     }
   
@@ -345,13 +345,14 @@ function App() {
     }
   };
 
+  // changeDeviceIdも同じ！！！
   const changeDeviceId = () => {
     const newId = prompt('新しいデバイスIDを入力してね！（空欄でランダムUUID）:');
     if (newId === null) return;
   
     let finalId;
     if (!newId || newId.trim() === '') {
-      finalId = uuidv4(); // 空欄なら自動生成
+      finalId = uuidv4();
     } else {
       finalId = newId.trim().replace(/\s/g, '');
       if (finalId === '') {
@@ -366,9 +367,10 @@ function App() {
     setFolderSearchId('');
     fetchFolders();
     fetchMemos();
-    
+  
+    // 即時alert！！！
     if (!isValidUUID(finalId)) {
-      alert(`IDを「${finalId}」に変更したよ！\n（古い形式でも使えるけど、安定するならUUIDがおすすめ！）`);
+      alert(`IDを「${finalId}」に変更したよ！\n古い形式でも使えるけど、安定するならUUIDがおすすめ！`);
     } else {
       alert('IDを変更したよ！データが切り替わった✨');
     }
