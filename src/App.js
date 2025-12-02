@@ -345,18 +345,20 @@ function App() {
     const newId = prompt('デバイスIDを入力（共有用）:');
     if (!newId) return;
   
-    const trimmed = newId.trim();
-    if (!isValidUUID(trimmed)) {
-      alert('不正なIDです！空白が入ってないか確認してね！');
+    let cleaned = newId.trim().replace(/\s/g, '').toLowerCase();
+  
+    if (!isValidUUID(cleaned)) {
+      alert('不正なIDです！\n\n空白や改行が入ってないか確認してね！\n（自動で消したけどダメだった…）');
       return;
     }
   
-    localStorage.setItem('deviceId', trimmed);
-    setDeviceId(trimmed);
+    localStorage.setItem('deviceId', cleaned);
+    setDeviceId(cleaned);
     setSelectedFolderId('');
     setFolderSearchId('');
     fetchFolders();
     fetchMemos();
+    alert('IDを変更したよ！データが切り替わった✨');
   };
   
   const toggleFolder = (folderId) => {
@@ -406,19 +408,26 @@ function App() {
 
   // loginWithId と changeDeviceId もバリデーション強化
   const loginWithId = () => {
-    const input = loginInputId.trim();
+    let input = loginInputId.trim(); // まずtrim
+  
     if (!input) return alert('IDを入力してね！');
+  
+    // ここが最強ポイント！！！コピペミスを自動で救う！！！
+    input = input.replace(/\s/g, ''); // 全部の空白・改行・タブを削除
+    input = input.toLowerCase();      // UUIDは小文字でもOKにする
+  
     if (!isValidUUID(input)) {
-      return alert('不正なIDです！コピペミスかも？');
+      return alert('不正なIDです！\n\nコピペしたときに余計な空白や改行が入ってないか確認してね！\n（自動で消そうとしたけどダメだったみたい…）');
     }
+  
     localStorage.setItem('deviceId', input);
     setDeviceId(input);
     setShowLoginModal(false);
     setLoginInputId('');
     fetchFolders();
     fetchMemos();
+    alert('ログイン成功！データが同期されたよ✨');
   };
-
   const charCount = selectedMemo ? selectedMemo.text.length : 0;
 
   return (
