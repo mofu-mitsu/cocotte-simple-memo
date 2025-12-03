@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from './supabase';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid'; // ← v5を追加！魔法の杖！
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
@@ -8,6 +8,9 @@ import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 library.add(fas);
+
+// 魔法用の定数（これを元にyuki〇〇をUUIDに変換するよ）
+const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
 
 function App() {
   const [memos, setMemos] = useState([]);
@@ -62,16 +65,26 @@ function App() {
   };
   const t = themeColors[theme];
 
-  // UUID有効判定関数（警告用）
+  // UUID有効判定関数
   const isValidUUID = (str) => {
     const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return regex.test(str);
   };
 
+  // 魔法の変換関数✨
+  // yuki〇〇 みたいなIDが来たら、特定のルールで正しいUUIDに変換してあげる！
+  const getFolderDeviceId = (id) => {
+    if (!id) return null;
+    // すでに正しいUUIDならそのまま使う
+    if (isValidUUID(id)) return id;
+    // そうじゃないなら、魔法（uuidv5）でUUIDに変換！
+    // これなら毎回同じ変換結果になるから、データも消えないよ✨
+    return uuidv5(id, UUID_NAMESPACE);
+  };
+
   // deviceId初期化
   useEffect(() => {
     let id = localStorage.getItem('deviceId');
-    // 空っぽの場合だけ新規作成。変な文字列でも入っていればそれを採用！
     if (!id || id.trim() === '') {
       id = uuidv4();
       localStorage.setItem('deviceId', id);
@@ -79,26 +92,29 @@ function App() {
     setDeviceId(id);
   }, []);
   
-  // createFolder
+  // createFolder（修正：魔法を使ってからDBに渡す！）
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
   
-    // deviceIdが空でなければOKにする（UUIDチェックは外した！）
     if (!deviceId || deviceId.trim() === '') {
       alert('デバイスIDが空です！アプリをリロードしてください！');
       return;
     }
+
+    // ここで変換！！
+    const targetDeviceId = getFolderDeviceId(deviceId);
   
     const { data, error } = await supabase
       .from('folders')
       .insert([{ 
         name: newFolderName.trim(), 
-        device_id: deviceId 
+        device_id: targetDeviceId // ← 変換後のIDを使う
       }])
       .select();
   
     if (error) {
       console.error('Error creating folder:', error);
+      // エラーメッセージを見やすく
       alert('フォルダ作成失敗: ' + error.message);
     } else {
       setNewFolderName('');
@@ -173,8 +189,14 @@ function App() {
     setHistoryIndex(newHistory.length - 1);
   }, []);
 
+  // fetchFolders（修正：フォルダを取ってくる時も魔法を使う！）
   const fetchFolders = async () => {
-    const { data, error } = await supabase.from('folders').select('*').eq('device_id', deviceId);
+    const targetDeviceId = getFolderDeviceId(deviceId); // ← ここでも変換！
+    const { data, error } = await supabase
+      .from('folders')
+      .select('*')
+      .eq('device_id', targetDeviceId); // ← 変換後のIDで検索
+
     if (error) console.error('Error fetching folders:', error);
     else setFolders(data || []);
   };
@@ -191,6 +213,7 @@ function App() {
     }
   };
 
+  // メモは元のID（yuki〇〇）のままでOK！（メモの箱は優しいからね）
   const fetchMemos = async () => {
     let query = supabase.from('memos').select('*').eq('device_id', deviceId).eq('is_deleted', showTrash);
     if (searchType === 'text' && searchQuery) query = query.ilike('text', `%${searchQuery}%`);
@@ -232,7 +255,7 @@ function App() {
       .insert([{
         text: newMemo.trim(),
         created_at: new Date(),
-        device_id: deviceId,
+        device_id: deviceId, // メモはそのままのIDでOK
         is_deleted: false,
         color: selectedColor,
         file_url: fileUrl,
@@ -341,7 +364,6 @@ function App() {
     }
   };
 
-  // changeDeviceIdも規制緩和！！！
   const changeDeviceId = () => {
     const newId = prompt('新しいデバイスIDを入力してね！（空欄でランダムUUID）:');
     if (newId === null) return;
@@ -350,7 +372,6 @@ function App() {
     if (!newId || newId.trim() === '') {
       finalId = uuidv4();
     } else {
-      // 空白は削除するけど、形式は何でもOKにする！
       finalId = newId.trim().replace(/\s/g, '');
       if (finalId === '') {
         alert('空白だけはダメだよ！');
@@ -365,9 +386,8 @@ function App() {
     fetchFolders();
     fetchMemos();
   
-    // 警告だけ出す！
     if (!isValidUUID(finalId)) {
-      alert(`IDを「${finalId}」に変更したよ！\n古い形式でも使えるけど、安定するならUUIDがおすすめ！`);
+      alert(`IDを「${finalId}」に変更したよ！\n古い形式でもフォルダ作成できるように裏技対応済みだよ✨`);
     } else {
       alert('IDを変更したよ！データが切り替わった✨');
     }
@@ -418,7 +438,6 @@ function App() {
     else fetchMemos();
   };
 
-  // loginWithId も規制緩和！！
   const loginWithId = () => {
     let input = loginInputId.trim();
     if (!input) return alert('IDを入力してね！');
@@ -433,9 +452,8 @@ function App() {
     fetchFolders();
     fetchMemos();
   
-    // UUIDじゃない場合だけ警告メッセージを出す（ログインはさせる！）
     if (!isValidUUID(cleaned)) {
-      alert(`ログインできたよ！✨\n\nでもこのID「${cleaned}」は古い形式だよ～\n今後安定して使うなら、メニューから「ID変更」で新しいUUIDに変えてね！`);
+      alert(`ログインできたよ！✨\n\nID「${cleaned}」でもフォルダが作れるように、裏側で調整しておいたよ！安心してね！`);
     } else {
       alert('ログイン成功！データが同期されたよ✨');
     }
