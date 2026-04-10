@@ -232,10 +232,17 @@ function App() {
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
-  const uploadFile = async (fileToUpload) => {
+const uploadFile = async (fileToUpload) => {
     const file = fileToUpload || selectedFile;
     if (!file) return null;
-    const fileName = `${deviceId}/${Date.now()}_${file.name}`;
+
+    // ✨ ここから修正！✨
+    // ファイル名に日本語やスペースがあるとエラーになるので、拡張子だけ取り出してUUIDにするよ！
+    const ext = file.name.split('.').pop(); // 「.png」などの拡張子を取り出す
+    const safeFileName = `${uuidv4()}.${ext}`; // 「ランダムな英数字.png」を作る
+    const fileName = `${deviceId}/${Date.now()}_${safeFileName}`; 
+    // ✨ 修正ここまで ✨
+
     const { error } = await supabase.storage.from('memos').upload(fileName, file);
     if (error) {
       console.error('アップロード失敗:', error);
