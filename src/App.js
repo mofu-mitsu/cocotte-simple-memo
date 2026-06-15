@@ -6,10 +6,10 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import toast, { Toaster } from 'react-hot-toast'; // ✨ トースト追加！
+import toast, { Toaster } from 'react-hot-toast';
 library.add(fas);
 
-// ✨ みつきのGAS URLを設定！
+// みつきのGAS URL！
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyq_kqREkoL8e0XyHsP25DlUFh48LNIu1GyBSU9EW0ioKFbnnGAJ0ECi4NTo-0sR3TM/exec';
 
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
@@ -40,7 +40,6 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
 
-  // Undo/Redo 用
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyRef = useRef([]);
@@ -77,7 +76,6 @@ function App() {
     setDeviceId(id);
   }, []);
 
-  // ✨ 裏側でこっそり通信する関数（画面を止めない！）
   const fetchGas = async (payload) => {
     try {
       const response = await fetch(GAS_URL, {
@@ -89,7 +87,7 @@ function App() {
       return data;
     } catch (error) {
       console.error('GAS Error:', error);
-      throw error; // Promiseでエラーをキャッチさせるために投げる
+      throw error;
     }
   };
 
@@ -121,7 +119,6 @@ function App() {
         setMemos(filtered);
       }
     } catch (e) {
-      // 初期読み込み時のエラーはサイレントにするか、小さく出す
       console.error('読み込み失敗:', e);
     }
   }, [deviceId, showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
@@ -141,11 +138,9 @@ function App() {
     if (!newFolderName.trim() || !deviceId) return;
     const newFolder = { id: uuidv4(), name: newFolderName.trim(), device_id: getFolderDeviceId(deviceId) };
     
-    // ✨ 即座に画面更新（爆速！）
     setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');
     
-    // 裏でGAS通信、トーストで結果表示
     toast.promise(
       fetchGas({ action: 'createFolder', folder: newFolder }),
       { loading: 'フォルダ作成中...', success: 'フォルダを作ったよ！', error: '作成失敗💦' }
@@ -156,20 +151,20 @@ function App() {
     if (!isSelectMode) return;
     if (!window.confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
 
-    // 即座に画面から消す
-    setFolders(prev => prev.filter(f => f.id !== folderId));
+    setFolders(prev => prev.filter(f => String(f.id) !== String(folderId)));
     setMemos(prev => prev.map(m => String(m.folder_id) === String(folderId) ? { ...m, folder_id: null } : m));
     
     toast.promise(
       fetchGas({ action: 'deleteFolder', folderId }),
-      { loading: '削除中...', success: '削除したよ！', error: 'エラーが発生しました' }
+      { loading: '削除中...', success: '削除したよ！', error: 'エラー💦' }
     );
   };
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
   const addMemo = async () => {
-    if (!newMemo.trim() || !deviceId) return;
+    const textVal = String(newMemo || '').trim();
+    if (!textVal || !deviceId) return;
     
     let fileData = null;
     let fileName = null;
@@ -181,7 +176,7 @@ function App() {
 
     const newMemoObj = {
       id: uuidv4(),
-      text: newMemo.trim(),
+      text: textVal,
       created_at: new Date().toISOString(),
       device_id: deviceId,
       is_deleted: false,
@@ -191,7 +186,7 @@ function App() {
       folder_id: selectedFolderId || '',
     };
 
-    // ✨ 即座に画面更新（待たせない！）
+    // ✨ ここで即座に画面反映！（サクサク！）
     setMemos(prev => [newMemoObj, ...prev]);
     setNewMemo('');
     setSelectedFile(null);
@@ -201,7 +196,7 @@ function App() {
       fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName }),
       { loading: '保存中...', success: 'メモを追加したよ！', error: '保存エラー💦' }
     ).then(() => {
-      if (fileData) fetchData(); // 画像がある時だけ、URLを取得するために再読み込み
+      if (fileData) fetchData(); 
     });
   };
 
@@ -216,10 +211,10 @@ function App() {
       fileName = `${uuidv4()}.${selectedFile.name.split('.').pop()}`;
     }
 
-    const updated = { ...selectedMemo, folder_id: selectedMemo.folder_id || '' };
+    const updated = { ...selectedMemo, text: String(selectedMemo.text || ''), folder_id: selectedMemo.folder_id || '' };
     
     // ✨ 即座に画面更新！
-    setMemos(prev => prev.map(m => m.id === updated.id ? updated : m));
+    setMemos(prev => prev.map(m => String(m.id) === String(updated.id) ? updated : m));
     setSelectedMemo(null);
     setSelectedFile(null);
 
@@ -233,8 +228,7 @@ function App() {
 
   const deleteMemo = async (id) => {
     setSelectedMemo(null);
-    // 即座に画面から消す
-    setMemos(prev => prev.filter(m => m.id !== id));
+    setMemos(prev => prev.filter(m => String(m.id) !== String(id)));
     
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true }),
@@ -247,8 +241,7 @@ function App() {
     if (!window.confirm(`選択した ${selectedMemos.size} 件を削除しますか？`)) return;
     
     const idsArray = Array.from(selectedMemos);
-    // 即座に画面から消す
-    setMemos(prev => prev.filter(m => !idsArray.includes(m.id)));
+    setMemos(prev => prev.filter(m => !idsArray.includes(String(m.id))));
     setSelectedMemos(new Set());
     setIsSelectMode(false);
     
@@ -259,7 +252,7 @@ function App() {
   };
 
   const restoreMemo = async (id) => {
-    setMemos(prev => prev.filter(m => m.id !== id));
+    setMemos(prev => prev.filter(m => String(m.id) !== String(id)));
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false }),
       { loading: '復元中...', success: '復元したよ！', error: 'エラー💦' }
@@ -277,9 +270,8 @@ function App() {
 
   const shareMemo = async (id) => {
     const shareUrl = `${window.location.origin}/share/${id}`;
-    const memoText = selectedMemo.text;
+    const memoText = String(selectedMemo.text || '');
 
-    // 裏で公開ステータスにする
     fetchGas({ action: 'updateMemoStatus', id, field: 'is_public', value: true });
 
     if (navigator.share) {
@@ -358,19 +350,25 @@ function App() {
 
   const toggleFolder = (folderId) => setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
   
-  // ✨ e.split エラーの完全防御 ✨
+  // 🛡️ ✨ 絶対にクラッシュしない最強の文字変換バリア ✨ 🛡️
+  const safeString = (val) => {
+    if (val === null || val === undefined) return '';
+    return String(val);
+  };
+
   const highlightText = (text) => {
-    const safeText = String(text || ''); // 絶対に文字列にする！
-    if (!searchQuery || searchType !== 'text') return safeText;
+    const str = safeString(text);
+    if (!searchQuery || searchType !== 'text') return str;
     try {
       const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(${escaped})`, 'gi');
-      return safeText.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
-    } catch { return safeText; }
+      return str.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
+    } catch { return str; }
   };
+
   const getTitle = (text) => {
-    const safeText = String(text || ''); // 絶対に文字列にする！
-    return <span>{highlightText(safeText.split('\n')[0] || '（無題）')}</span>;
+    const str = safeString(text);
+    return <span>{highlightText(str.split('\n')[0] || '（無題）')}</span>;
   };
 
   const toggleSelectMemo = (id) => {
@@ -385,7 +383,6 @@ function App() {
     if (!result.destination || result.source.droppableId === result.destination.droppableId) return;
     let newFolderId = result.destination.droppableId === 'uncategorized' ? '' : result.destination.droppableId.replace('folder-', '');
     
-    // 即座に画面更新！
     setMemos(prev => prev.map(m => String(m.id) === String(result.draggableId) ? { ...m, folder_id: newFolderId || null } : m));
     
     toast.promise(
@@ -430,7 +427,7 @@ function App() {
 
   useEffect(() => {
     if (selectedMemo && history.length === 0) {
-      setHistory([selectedMemo.text || '']);
+      setHistory([safeString(selectedMemo.text)]);
       setHistoryIndex(0);
     }
   }, [selectedMemo]);
@@ -438,7 +435,6 @@ function App() {
   return (
     <div style={{ backgroundColor: t.bg, color: t.text, minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box' }}>
       
-      {/* ✨ トースト通知の表示場所 */}
       <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: '#333', color: '#fff', fontWeight: 'bold' } }} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
@@ -500,7 +496,7 @@ function App() {
           </select>
           <select value={selectedFolderId} onChange={(e) => setSelectedFolderId(e.target.value)} style={{ flex: '1 1 140px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
             <option value="">未分類</option>
-            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
           </select>
           <label style={{ flex: '1 1 180px', background: selectedFile ? t.dark : t.main, color: 'white', padding: '14px 16px', borderRadius: '14px', cursor: 'pointer', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <FontAwesomeIcon icon="paperclip" /> {selectedFile ? selectedFile.name : 'ファイル(5MB迄)'}
@@ -522,7 +518,7 @@ function App() {
         {searchType === 'folder' && (
           <select value={folderSearchId} onChange={(e) => setFolderSearchId(e.target.value)} style={{ flex: '1 1 200px', padding: '10px', border: `2px solid ${t.main}`, borderRadius: '12px', background: 'white', color: t.text }}>
             <option value="">全てのフォルダ</option>
-            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
           </select>
         )}
       </div>
@@ -554,7 +550,7 @@ function App() {
               const folderMemos = memos.filter(m => String(m.folder_id) === String(folder.id));
               const isOpen = openFolders[folder.id] || false;
               return (
-                <div key={folder.id} style={{ marginBottom: '18px' }}>
+                <div key={String(folder.id)} style={{ marginBottom: '18px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', background: t.light, padding: '10px', borderRadius: '12px' }}>
                     <div onClick={() => toggleFolder(folder.id)} style={{ cursor: 'pointer', fontWeight: 'bold', color: t.dark }}>
                       {folder.name} ({folderMemos.length})
@@ -569,7 +565,7 @@ function App() {
                             <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                               {(provided, snapshot) => (
                                 <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '12px', cursor: isSelectMode ? 'default' : 'pointer', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: snapshot.isDragging ? `0 12px 28px ${t.main}77` : '0 2px 8px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden' }}>
-                                  {isSelectMode && <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
+                                  {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
                                   <div {...provided.dragHandleProps} style={{ position: 'absolute', left: 0, top: 0, width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab' }}>
                                     <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px' }} />
                                   </div>
@@ -598,7 +594,7 @@ function App() {
                       <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                         {(provided) => (
                           <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '12px', display: 'flex', alignItems: 'center', color: t.dark, position: 'relative' }}>
-                            {isSelectMode && <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', marginLeft: '40px' }} />}
+                            {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', marginLeft: '40px' }} />}
                             <div {...provided.dragHandleProps} style={{ position: 'absolute', left: 0, top: 0, width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px' }} />
                             </div>
@@ -619,8 +615,8 @@ function App() {
       {showTrash && (
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {memos.map(memo => (
-            <li key={memo.id} style={{ backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', color: t.dark }}>
-              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(memo.id)} onChange={() => toggleSelectMemo(memo.id)} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
+            <li key={String(memo.id)} style={{ backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', color: t.dark }}>
+              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
               <strong>{getTitle(memo.text)}</strong>
               <button onClick={() => restoreMemo(memo.id)} style={{ marginLeft: 'auto', background: t.main, color: 'white', padding: '8px 14px', borderRadius: '20px' }}>復元</button>
             </li>
@@ -633,19 +629,24 @@ function App() {
           <div style={{ background: 'white', borderRadius: '32px', padding: '24px 20px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <button onClick={() => setSelectedMemo(null)} style={{ alignSelf: 'flex-end', background: '#999', color: 'white', padding: '8px 16px', borderRadius: '20px', marginBottom: '12px' }}>✕ 閉じる</button>
             
+            {/* 🛡️ モーダルのタイトルも安全仕様に修正！ */}
+            <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 18px', fontSize: '22px' }}>
+              {getTitle(selectedMemo.text)}
+            </h3>
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
               <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? t.light : t.main, color: 'white', padding: '14px 18px', borderRadius: '50%' }}><FontAwesomeIcon icon="undo" /></button>
               <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ background: historyIndex >= history.length - 1 ? t.light : t.main, color: 'white', padding: '14px 18px', borderRadius: '50%' }}><FontAwesomeIcon icon="redo" /></button>
             </div>
             
-            <textarea ref={textareaRef} value={selectedMemo.text} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '16px', border: `3px solid ${t.main}`, borderRadius: '16px', fontSize: '16px', boxSizing: 'border-box' }} />
+            <textarea ref={textareaRef} value={safeString(selectedMemo.text)} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '16px', border: `3px solid ${t.main}`, borderRadius: '16px', fontSize: '16px', boxSizing: 'border-box' }} />
             
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '15px' }}>
               <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
                 <option value="#ffffff">白</option><option value="#ffe6f0">ピンク</option><option value="#e3f2fd">水色</option><option value="#e6ffe6">グリーン</option>
               </select>
               <select value={selectedMemo.folder_id || ''} onChange={(e) => setSelectedMemo(prev => ({ ...prev, folder_id: e.target.value || null }))} style={{ flex: '1', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
-                <option value="">未分類</option>{folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                <option value="">未分類</option>{folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
               </select>
               <label style={{ flex: '1 1 100%', background: selectedMemo.file_url ? t.dark : t.main, color: 'white', padding: '14px', borderRadius: '14px', textAlign: 'center', cursor: 'pointer' }}>
                 <FontAwesomeIcon icon="paperclip" /> {selectedMemo.file_url ? 'ファイル再選択' : 'ファイル添付'}
