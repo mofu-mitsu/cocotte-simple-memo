@@ -15,6 +15,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyq_kqREkoL8e0XyHsP25Dl
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
 
 function App() {
+  console.log("🌸 最新のコードが動いてるよー！！");
   const [memos, setMemos] = useState([]);
   const [newMemo, setNewMemo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
