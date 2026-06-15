@@ -6,9 +6,10 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import toast, { Toaster } from 'react-hot-toast'; // ✨ トースト追加！
 library.add(fas);
 
-// ✨ ここにさっきGASでデプロイしたURLを貼ってね！ ✨
+// ✨ みつきのGAS URLを設定！
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyq_kqREkoL8e0XyHsP25DlUFh48LNIu1GyBSU9EW0ioKFbnnGAJ0ECi4NTo-0sR3TM/exec';
 
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
@@ -38,9 +39,6 @@ function App() {
   const [theme, setTheme] = useState('pink');
   const [showMenu, setShowMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
-  
-  // ✨ ローディング状態（GASは少し時間がかかるため）
-  const [isLoading, setIsLoading] = useState(false);
 
   // Undo/Redo 用
   const [history, setHistory] = useState([]);
@@ -79,13 +77,11 @@ function App() {
     setDeviceId(id);
   }, []);
 
-  // ✨ GASと通信するための最強ヘルパー関数 ✨
+  // ✨ 裏側でこっそり通信する関数（画面を止めない！）
   const fetchGas = async (payload) => {
-    setIsLoading(true);
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
-        // GASのCORS回避のため、あえてヘッダーは付けないか text/plain にするのがコツ！
         body: JSON.stringify(payload),
       });
       const data = await response.json();
@@ -93,50 +89,45 @@ function App() {
       return data;
     } catch (error) {
       console.error('GAS Error:', error);
-      alert('通信エラーが発生したよ！やり直してみてね。');
-      return null;
-    } finally {
-      setIsLoading(false);
+      throw error; // Promiseでエラーをキャッチさせるために投げる
     }
   };
 
-  // データを引っ張ってくる
   const fetchData = useCallback(async () => {
     if (!deviceId) return;
-    const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
-    if (folderRes) setFolders(folderRes.data || []);
+    try {
+      const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
+      if (folderRes) setFolders(folderRes.data || []);
 
-    const memoRes = await fetchGas({ action: 'getMemos', deviceId });
-    if (memoRes) {
-      // 削除済み・未削除のフィルタリングと、検索処理をReact側でやるよ！
-      let filtered = (memoRes.data || []).filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
-      
-      if (searchType === 'text' && searchQuery) {
-        filtered = filtered.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase()));
+      const memoRes = await fetchGas({ action: 'getMemos', deviceId });
+      if (memoRes) {
+        let filtered = (memoRes.data || []).filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
+        
+        if (searchType === 'text' && searchQuery) {
+          filtered = filtered.filter(m => String(m.text || '').toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+        if (searchType === 'date' && selectedDate) {
+          const start = new Date(selectedDate).setHours(0,0,0,0);
+          const end = new Date(selectedDate).setHours(23,59,59,999);
+          filtered = filtered.filter(m => {
+            const d = new Date(m.created_at).getTime();
+            return d >= start && d <= end;
+          });
+        }
+        if (folderSearchId) {
+          filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
+        }
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setMemos(filtered);
       }
-      if (searchType === 'date' && selectedDate) {
-        const start = new Date(selectedDate).setHours(0,0,0,0);
-        const end = new Date(selectedDate).setHours(23,59,59,999);
-        filtered = filtered.filter(m => {
-          const d = new Date(m.created_at).getTime();
-          return d >= start && d <= end;
-        });
-      }
-      if (folderSearchId) {
-        filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
-      }
-      
-      // 日付の新しい順に並び替え
-      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setMemos(filtered);
+    } catch (e) {
+      // 初期読み込み時のエラーはサイレントにするか、小さく出す
+      console.error('読み込み失敗:', e);
     }
   }, [deviceId, showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ファイルをBase64に変換する魔法 ✨
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -150,18 +141,29 @@ function App() {
     if (!newFolderName.trim() || !deviceId) return;
     const newFolder = { id: uuidv4(), name: newFolderName.trim(), device_id: getFolderDeviceId(deviceId) };
     
-    // 見た目を先に更新（爆速に見せるため！）
+    // ✨ 即座に画面更新（爆速！）
     setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');
     
-    await fetchGas({ action: 'createFolder', folder: newFolder });
+    // 裏でGAS通信、トーストで結果表示
+    toast.promise(
+      fetchGas({ action: 'createFolder', folder: newFolder }),
+      { loading: 'フォルダ作成中...', success: 'フォルダを作ったよ！', error: '作成失敗💦' }
+    );
   };
 
   const deleteFolder = async (folderId) => {
-    if (!isSelectMode || !confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
+    if (!isSelectMode) return;
+    if (!window.confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
+
+    // 即座に画面から消す
     setFolders(prev => prev.filter(f => f.id !== folderId));
-    setMemos(prev => prev.map(m => m.folder_id === folderId ? { ...m, folder_id: null } : m));
-    await fetchGas({ action: 'deleteFolder', folderId });
+    setMemos(prev => prev.map(m => String(m.folder_id) === String(folderId) ? { ...m, folder_id: null } : m));
+    
+    toast.promise(
+      fetchGas({ action: 'deleteFolder', folderId }),
+      { loading: '削除中...', success: '削除したよ！', error: 'エラーが発生しました' }
+    );
   };
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
@@ -171,11 +173,8 @@ function App() {
     
     let fileData = null;
     let fileName = null;
-    
     if (selectedFile) {
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        return alert('ファイルが大きすぎるよ！5MB以下にしてね！');
-      }
+      if (selectedFile.size > 5 * 1024 * 1024) return toast.error('ファイルが大きすぎるよ！5MB以下にしてね！');
       fileData = await fileToBase64(selectedFile);
       fileName = `${uuidv4()}.${selectedFile.name.split('.').pop()}`;
     }
@@ -187,17 +186,23 @@ function App() {
       device_id: deviceId,
       is_deleted: false,
       color: selectedColor,
-      file_url: '', // GAS側で上書きされる
+      file_url: '', 
       is_public: false,
       folder_id: selectedFolderId || '',
     };
 
+    // ✨ 即座に画面更新（待たせない！）
+    setMemos(prev => [newMemoObj, ...prev]);
     setNewMemo('');
     setSelectedFile(null);
     setSelectedFolderId('');
 
-    await fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName });
-    fetchData(); // 画像URLをもらうために再取得
+    toast.promise(
+      fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName }),
+      { loading: '保存中...', success: 'メモを追加したよ！', error: '保存エラー💦' }
+    ).then(() => {
+      if (fileData) fetchData(); // 画像がある時だけ、URLを取得するために再読み込み
+    });
   };
 
   const updateMemo = async () => {
@@ -206,53 +211,81 @@ function App() {
     let fileData = null;
     let fileName = null;
     if (selectedFile) {
-      if (selectedFile.size > 5 * 1024 * 1024) return alert('5MB以下にしてね！');
+      if (selectedFile.size > 5 * 1024 * 1024) return toast.error('ファイルは5MB以下にしてね！');
       fileData = await fileToBase64(selectedFile);
       fileName = `${uuidv4()}.${selectedFile.name.split('.').pop()}`;
     }
 
     const updated = { ...selectedMemo, folder_id: selectedMemo.folder_id || '' };
+    
+    // ✨ 即座に画面更新！
+    setMemos(prev => prev.map(m => m.id === updated.id ? updated : m));
     setSelectedMemo(null);
     setSelectedFile(null);
 
-    await fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName });
-    fetchData();
+    toast.promise(
+      fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName }),
+      { loading: '更新中...', success: '更新したよ！', error: '更新エラー💦' }
+    ).then(() => {
+      if (fileData) fetchData();
+    });
   };
 
   const deleteMemo = async (id) => {
     setSelectedMemo(null);
+    // 即座に画面から消す
     setMemos(prev => prev.filter(m => m.id !== id));
-    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true });
+    
+    toast.promise(
+      fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true }),
+      { loading: '削除中...', success: 'ゴミ箱に入れたよ', error: 'エラー💦' }
+    );
   };
 
   const bulkDelete = async () => {
-    if (selectedMemos.size === 0 || !confirm(`選択した ${selectedMemos.size} 件を削除しますか？`)) return;
+    if (selectedMemos.size === 0) return;
+    if (!window.confirm(`選択した ${selectedMemos.size} 件を削除しますか？`)) return;
+    
     const idsArray = Array.from(selectedMemos);
+    // 即座に画面から消す
     setMemos(prev => prev.filter(m => !idsArray.includes(m.id)));
     setSelectedMemos(new Set());
     setIsSelectMode(false);
-    await fetchGas({ action: 'deleteMemos', ids: idsArray });
+    
+    toast.promise(
+      fetchGas({ action: 'deleteMemos', ids: idsArray }),
+      { loading: '一括削除中...', success: '削除したよ！', error: 'エラー💦' }
+    );
   };
 
   const restoreMemo = async (id) => {
     setMemos(prev => prev.filter(m => m.id !== id));
-    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false });
+    toast.promise(
+      fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false }),
+      { loading: '復元中...', success: '復元したよ！', error: 'エラー💦' }
+    );
   };
 
   const clearTrash = async () => {
-    if (!confirm('ゴミ箱を空にしますか？（元に戻せません！）')) return;
+    if (!window.confirm('ゴミ箱を空にしますか？（元に戻せません！）')) return;
     setMemos([]);
-    await fetchGas({ action: 'clearTrash', deviceId });
+    toast.promise(
+      fetchGas({ action: 'clearTrash', deviceId }),
+      { loading: 'お掃除中...', success: 'ゴミ箱を空にしたよ！', error: 'エラー💦' }
+    );
   };
 
   const shareMemo = async (id) => {
-    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_public', value: true });
     const shareUrl = `${window.location.origin}/share/${id}`;
     const memoText = selectedMemo.text;
+
+    // 裏で公開ステータスにする
+    fetchGas({ action: 'updateMemoStatus', id, field: 'is_public', value: true });
 
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Cocotteメモ', text: memoText, url: shareUrl });
+        toast.success('共有画面を開いたよ！');
       } catch (err) { fallbackCopy(shareUrl, memoText); }
     } else { fallbackCopy(shareUrl, memoText); }
   };
@@ -260,11 +293,12 @@ function App() {
   const fallbackCopy = async (url, text) => {
     try {
       await navigator.clipboard.writeText(`${url}\n\n${text}`);
-      alert(`URLと本文をコピーしたよ！\n${url}`);
-    } catch (err) { prompt('コピー失敗！手動でしてね', `${url}\n\n${text}`); }
+      toast.success('URLと本文をコピーしたよ！');
+    } catch (err) { 
+      toast.error('コピー失敗💦手動でコピーしてね！'); 
+    }
   };
 
-  // ✨ ローカルバックアップ機能（無敵） ✨
   const exportData = () => {
     const data = { deviceId, folders, memos, exportDate: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -276,7 +310,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    alert('バックアップをダウンロードしたよ！\nこれでDBが吹っ飛んでも安心だね✨');
+    toast.success('バックアップを保存したよ！✨');
     setShowMenu(false);
   };
 
@@ -288,16 +322,13 @@ function App() {
       try {
         const data = JSON.parse(e.target.result);
         if (!data.memos || !data.folders) throw new Error('データ形式が違うみたい…');
-        
-        if (confirm(`【警告】現在の全データを上書き復元する？\n（復元後、少し時間がかかります）`)) {
-          // ※今回は簡易的にフロントエンドで反映させてから、必要なものだけGASに送るか、
-          // またはバックアップ時点のID（deviceId）でログインし直す運用を推奨！
+        if (window.confirm(`【警告】現在のデータを上書き復元する？`)) {
           localStorage.setItem('deviceId', data.deviceId);
           setDeviceId(data.deviceId);
-          alert('IDをバックアップ時点のものに変更したよ！\n再読み込みしてね✨');
-          window.location.reload();
+          toast.success('IDを復元したよ！再読み込みします✨');
+          setTimeout(() => window.location.reload(), 1500);
         }
-      } catch (error) { alert('読み込みエラー: ' + error.message); }
+      } catch (error) { toast.error('読み込みエラー💦'); }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -305,34 +336,42 @@ function App() {
   };
 
   const changeDeviceId = () => {
-    const newId = prompt('新しいデバイスID（空欄でランダム）:');
+    const newId = window.prompt('新しいデバイスID（空欄でランダム）:');
     if (newId === null) return;
     const finalId = newId.trim() === '' ? uuidv4() : newId.trim().replace(/\s/g, '');
     localStorage.setItem('deviceId', finalId);
     setDeviceId(finalId);
     setFolders([]); setMemos([]);
+    toast.success('IDを変更したよ！');
   };
   
   const loginWithId = () => {
     let input = loginInputId.trim().replace(/\s/g, '');
-    if (!input) return alert('IDが空だよ！');
+    if (!input) return toast.error('IDが空だよ！');
     localStorage.setItem('deviceId', input);
     setDeviceId(input);
     setShowLoginModal(false);
     setLoginInputId('');
     setFolders([]); setMemos([]);
+    toast.success('ログインしたよ！');
   };
 
   const toggleFolder = (folderId) => setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+  
+  // ✨ e.split エラーの完全防御 ✨
   const highlightText = (text) => {
-    if (!searchQuery || searchType !== 'text') return text;
+    const safeText = String(text || ''); // 絶対に文字列にする！
+    if (!searchQuery || searchType !== 'text') return safeText;
     try {
       const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(${escaped})`, 'gi');
-      return text.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
-    } catch { return text; }
+      return safeText.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
+    } catch { return safeText; }
   };
-  const getTitle = (text) => <span>{highlightText(text.split('\n')[0] || '（無題）')}</span>;
+  const getTitle = (text) => {
+    const safeText = String(text || ''); // 絶対に文字列にする！
+    return <span>{highlightText(safeText.split('\n')[0] || '（無題）')}</span>;
+  };
 
   const toggleSelectMemo = (id) => {
     setSelectedMemos(prev => {
@@ -346,14 +385,17 @@ function App() {
     if (!result.destination || result.source.droppableId === result.destination.droppableId) return;
     let newFolderId = result.destination.droppableId === 'uncategorized' ? '' : result.destination.droppableId.replace('folder-', '');
     
-    // UIを先に更新！
-    setMemos(prev => prev.map(m => m.id === result.draggableId ? { ...m, folder_id: newFolderId || null } : m));
-    await fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId });
+    // 即座に画面更新！
+    setMemos(prev => prev.map(m => String(m.id) === String(result.draggableId) ? { ...m, folder_id: newFolderId || null } : m));
+    
+    toast.promise(
+      fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId }),
+      { loading: '移動中...', success: '移動したよ！', error: 'エラー💦' }
+    );
   };
 
   const scrollToInput = () => document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  // Undo/Redo logic
   const undo = useCallback(() => {
     if (indexRef.current <= 0) return;
     const newIdx = indexRef.current - 1;
@@ -396,15 +438,9 @@ function App() {
   return (
     <div style={{ backgroundColor: t.bg, color: t.text, minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box' }}>
       
-      {/* ✨ 全面ローディング表示 ✨ */}
-      {isLoading && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(255,255,255,0.7)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <FontAwesomeIcon icon="spinner" spin style={{ fontSize: '50px', color: t.main }} />
-          <p style={{ color: t.dark, fontWeight: 'bold', marginTop: '10px' }}>通信中...</p>
-        </div>
-      )}
+      {/* ✨ トースト通知の表示場所 */}
+      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: '#333', color: '#fff', fontWeight: 'bold' } }} />
 
-      {/* タイトルバー */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ background: `linear-gradient(135deg, ${t.main}, ${t.dark})`, padding: '16px 32px', borderRadius: '40px', boxShadow: `0 8px 20px ${t.dark}55, inset 0 0 20px rgba(255,255,255,0.3)`, border: '6px solid #fff', position: 'relative', display: 'inline-block' }}>
           <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: t.main, padding: '4px 12px', borderRadius: '20px', border: '4px solid #fff', fontSize: '18px', color: 'white' }}>
@@ -435,7 +471,6 @@ function App() {
                 <button onClick={() => {changeDeviceId(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>ID変更</button>
                 <button onClick={() => {setShowLoginModal(true); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '15px' }}>ログイン</button>
                 
-                {/* ✨ バックアップメニュー ✨ */}
                 <div style={{ borderTop: `2px dashed ${t.light}`, paddingTop: '10px' }}>
                   <button onClick={exportData} style={{ width: '100%', background: t.main, color: 'white', padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>
                     <FontAwesomeIcon icon="download" /> バックアップ保存
@@ -454,7 +489,7 @@ function App() {
       <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
         <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all' }}>{deviceId}</p>
-        <button onClick={() => { navigator.clipboard.writeText(deviceId); alert('コピーしたよ！'); }} style={{ marginTop: '10px', background: t.main, color: 'white', padding: '8px 16px', borderRadius: '12px', fontSize: '14px' }}>コピー</button>
+        <button onClick={() => { navigator.clipboard.writeText(deviceId); toast.success('IDをコピーしたよ！'); }} style={{ marginTop: '10px', background: t.main, color: 'white', padding: '8px 16px', borderRadius: '12px', fontSize: '14px' }}>コピー</button>
       </div>
 
       <div style={{ background: t.light, padding: '20px', borderRadius: '20px', marginBottom: '20px', boxShadow: `0 6px 20px ${t.dark}33`, boxSizing: 'border-box' }}>
