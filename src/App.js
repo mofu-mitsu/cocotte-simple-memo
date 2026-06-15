@@ -6,10 +6,9 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import toast, { Toaster } from 'react-hot-toast';
 library.add(fas);
 
-// みつきのGAS URL！
+// ✨ ここにさっきGASでデプロイしたURLを貼ってね！ ✨
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyq_kqREkoL8e0XyHsP25DlUFh48LNIu1GyBSU9EW0ioKFbnnGAJ0ECi4NTo-0sR3TM/exec';
 
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
@@ -39,7 +38,11 @@ function App() {
   const [theme, setTheme] = useState('pink');
   const [showMenu, setShowMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
+  
+  // ✨ ローディング状態（GASは少し時間がかかるため）
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Undo/Redo 用
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyRef = useRef([]);
@@ -76,10 +79,13 @@ function App() {
     setDeviceId(id);
   }, []);
 
+  // ✨ GASと通信するための最強ヘルパー関数 ✨
   const fetchGas = async (payload) => {
+    setIsLoading(true);
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
+        // GASのCORS回避のため、あえてヘッダーは付けないか text/plain にするのがコツ！
         body: JSON.stringify(payload),
       });
       const data = await response.json();
@@ -87,44 +93,50 @@ function App() {
       return data;
     } catch (error) {
       console.error('GAS Error:', error);
-      throw error;
+      alert('通信エラーが発生したよ！やり直してみてね。');
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // データを引っ張ってくる
   const fetchData = useCallback(async () => {
     if (!deviceId) return;
-    try {
-      const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
-      if (folderRes) setFolders(folderRes.data || []);
+    const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
+    if (folderRes) setFolders(folderRes.data || []);
 
-      const memoRes = await fetchGas({ action: 'getMemos', deviceId });
-      if (memoRes) {
-        let filtered = (memoRes.data || []).filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
-        
-        if (searchType === 'text' && searchQuery) {
-          filtered = filtered.filter(m => String(m.text || '').toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        if (searchType === 'date' && selectedDate) {
-          const start = new Date(selectedDate).setHours(0,0,0,0);
-          const end = new Date(selectedDate).setHours(23,59,59,999);
-          filtered = filtered.filter(m => {
-            const d = new Date(m.created_at).getTime();
-            return d >= start && d <= end;
-          });
-        }
-        if (folderSearchId) {
-          filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
-        }
-        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        setMemos(filtered);
+    const memoRes = await fetchGas({ action: 'getMemos', deviceId });
+    if (memoRes) {
+      // 削除済み・未削除のフィルタリングと、検索処理をReact側でやるよ！
+      let filtered = (memoRes.data || []).filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
+      
+      if (searchType === 'text' && searchQuery) {
+        filtered = filtered.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase()));
       }
-    } catch (e) {
-      console.error('読み込み失敗:', e);
+      if (searchType === 'date' && selectedDate) {
+        const start = new Date(selectedDate).setHours(0,0,0,0);
+        const end = new Date(selectedDate).setHours(23,59,59,999);
+        filtered = filtered.filter(m => {
+          const d = new Date(m.created_at).getTime();
+          return d >= start && d <= end;
+        });
+      }
+      if (folderSearchId) {
+        filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
+      }
+      
+      // 日付の新しい順に並び替え
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setMemos(filtered);
     }
   }, [deviceId, showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
+  // ファイルをBase64に変換する魔法 ✨
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -138,66 +150,54 @@ function App() {
     if (!newFolderName.trim() || !deviceId) return;
     const newFolder = { id: uuidv4(), name: newFolderName.trim(), device_id: getFolderDeviceId(deviceId) };
     
+    // 見た目を先に更新（爆速に見せるため！）
     setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');
     
-    toast.promise(
-      fetchGas({ action: 'createFolder', folder: newFolder }),
-      { loading: 'フォルダ作成中...', success: 'フォルダを作ったよ！', error: '作成失敗💦' }
-    );
+    await fetchGas({ action: 'createFolder', folder: newFolder });
   };
 
   const deleteFolder = async (folderId) => {
-    if (!isSelectMode) return;
-    if (!window.confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
-
-    setFolders(prev => prev.filter(f => String(f.id) !== String(folderId)));
-    setMemos(prev => prev.map(m => String(m.folder_id) === String(folderId) ? { ...m, folder_id: null } : m));
-    
-    toast.promise(
-      fetchGas({ action: 'deleteFolder', folderId }),
-      { loading: '削除中...', success: '削除したよ！', error: 'エラー💦' }
-    );
+    if (!isSelectMode || !confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    setMemos(prev => prev.map(m => m.folder_id === folderId ? { ...m, folder_id: null } : m));
+    await fetchGas({ action: 'deleteFolder', folderId });
   };
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
   const addMemo = async () => {
-    const textVal = String(newMemo || '').trim();
-    if (!textVal || !deviceId) return;
+    if (!newMemo.trim() || !deviceId) return;
     
     let fileData = null;
     let fileName = null;
+    
     if (selectedFile) {
-      if (selectedFile.size > 5 * 1024 * 1024) return toast.error('ファイルが大きすぎるよ！5MB以下にしてね！');
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        return alert('ファイルが大きすぎるよ！5MB以下にしてね！');
+      }
       fileData = await fileToBase64(selectedFile);
       fileName = `${uuidv4()}.${selectedFile.name.split('.').pop()}`;
     }
 
     const newMemoObj = {
       id: uuidv4(),
-      text: textVal,
+      text: newMemo.trim(),
       created_at: new Date().toISOString(),
       device_id: deviceId,
       is_deleted: false,
       color: selectedColor,
-      file_url: '', 
+      file_url: '', // GAS側で上書きされる
       is_public: false,
       folder_id: selectedFolderId || '',
     };
 
-    // ✨ ここで即座に画面反映！（サクサク！）
-    setMemos(prev => [newMemoObj, ...prev]);
     setNewMemo('');
     setSelectedFile(null);
     setSelectedFolderId('');
 
-    toast.promise(
-      fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName }),
-      { loading: '保存中...', success: 'メモを追加したよ！', error: '保存エラー💦' }
-    ).then(() => {
-      if (fileData) fetchData(); 
-    });
+    await fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName });
+    fetchData(); // 画像URLをもらうために再取得
   };
 
   const updateMemo = async () => {
@@ -206,78 +206,53 @@ function App() {
     let fileData = null;
     let fileName = null;
     if (selectedFile) {
-      if (selectedFile.size > 5 * 1024 * 1024) return toast.error('ファイルは5MB以下にしてね！');
+      if (selectedFile.size > 5 * 1024 * 1024) return alert('5MB以下にしてね！');
       fileData = await fileToBase64(selectedFile);
       fileName = `${uuidv4()}.${selectedFile.name.split('.').pop()}`;
     }
 
-    const updated = { ...selectedMemo, text: String(selectedMemo.text || ''), folder_id: selectedMemo.folder_id || '' };
-    
-    // ✨ 即座に画面更新！
-    setMemos(prev => prev.map(m => String(m.id) === String(updated.id) ? updated : m));
+    const updated = { ...selectedMemo, folder_id: selectedMemo.folder_id || '' };
     setSelectedMemo(null);
     setSelectedFile(null);
 
-    toast.promise(
-      fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName }),
-      { loading: '更新中...', success: '更新したよ！', error: '更新エラー💦' }
-    ).then(() => {
-      if (fileData) fetchData();
-    });
+    await fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName });
+    fetchData();
   };
 
   const deleteMemo = async (id) => {
     setSelectedMemo(null);
-    setMemos(prev => prev.filter(m => String(m.id) !== String(id)));
-    
-    toast.promise(
-      fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true }),
-      { loading: '削除中...', success: 'ゴミ箱に入れたよ', error: 'エラー💦' }
-    );
+    setMemos(prev => prev.filter(m => m.id !== id));
+    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true });
   };
 
   const bulkDelete = async () => {
-    if (selectedMemos.size === 0) return;
-    if (!window.confirm(`選択した ${selectedMemos.size} 件を削除しますか？`)) return;
-    
+    if (selectedMemos.size === 0 || !confirm(`選択した ${selectedMemos.size} 件を削除しますか？`)) return;
     const idsArray = Array.from(selectedMemos);
-    setMemos(prev => prev.filter(m => !idsArray.includes(String(m.id))));
+    setMemos(prev => prev.filter(m => !idsArray.includes(m.id)));
     setSelectedMemos(new Set());
     setIsSelectMode(false);
-    
-    toast.promise(
-      fetchGas({ action: 'deleteMemos', ids: idsArray }),
-      { loading: '一括削除中...', success: '削除したよ！', error: 'エラー💦' }
-    );
+    await fetchGas({ action: 'deleteMemos', ids: idsArray });
   };
 
   const restoreMemo = async (id) => {
-    setMemos(prev => prev.filter(m => String(m.id) !== String(id)));
-    toast.promise(
-      fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false }),
-      { loading: '復元中...', success: '復元したよ！', error: 'エラー💦' }
-    );
+    setMemos(prev => prev.filter(m => m.id !== id));
+    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false });
   };
 
   const clearTrash = async () => {
-    if (!window.confirm('ゴミ箱を空にしますか？（元に戻せません！）')) return;
+    if (!confirm('ゴミ箱を空にしますか？（元に戻せません！）')) return;
     setMemos([]);
-    toast.promise(
-      fetchGas({ action: 'clearTrash', deviceId }),
-      { loading: 'お掃除中...', success: 'ゴミ箱を空にしたよ！', error: 'エラー💦' }
-    );
+    await fetchGas({ action: 'clearTrash', deviceId });
   };
 
   const shareMemo = async (id) => {
+    await fetchGas({ action: 'updateMemoStatus', id, field: 'is_public', value: true });
     const shareUrl = `${window.location.origin}/share/${id}`;
-    const memoText = String(selectedMemo.text || '');
-
-    fetchGas({ action: 'updateMemoStatus', id, field: 'is_public', value: true });
+    const memoText = selectedMemo.text;
 
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Cocotteメモ', text: memoText, url: shareUrl });
-        toast.success('共有画面を開いたよ！');
       } catch (err) { fallbackCopy(shareUrl, memoText); }
     } else { fallbackCopy(shareUrl, memoText); }
   };
@@ -285,12 +260,11 @@ function App() {
   const fallbackCopy = async (url, text) => {
     try {
       await navigator.clipboard.writeText(`${url}\n\n${text}`);
-      toast.success('URLと本文をコピーしたよ！');
-    } catch (err) { 
-      toast.error('コピー失敗💦手動でコピーしてね！'); 
-    }
+      alert(`URLと本文をコピーしたよ！\n${url}`);
+    } catch (err) { prompt('コピー失敗！手動でしてね', `${url}\n\n${text}`); }
   };
 
+  // ✨ ローカルバックアップ機能（無敵） ✨
   const exportData = () => {
     const data = { deviceId, folders, memos, exportDate: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -302,7 +276,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('バックアップを保存したよ！✨');
+    alert('バックアップをダウンロードしたよ！\nこれでDBが吹っ飛んでも安心だね✨');
     setShowMenu(false);
   };
 
@@ -314,13 +288,16 @@ function App() {
       try {
         const data = JSON.parse(e.target.result);
         if (!data.memos || !data.folders) throw new Error('データ形式が違うみたい…');
-        if (window.confirm(`【警告】現在のデータを上書き復元する？`)) {
+        
+        if (confirm(`【警告】現在の全データを上書き復元する？\n（復元後、少し時間がかかります）`)) {
+          // ※今回は簡易的にフロントエンドで反映させてから、必要なものだけGASに送るか、
+          // またはバックアップ時点のID（deviceId）でログインし直す運用を推奨！
           localStorage.setItem('deviceId', data.deviceId);
           setDeviceId(data.deviceId);
-          toast.success('IDを復元したよ！再読み込みします✨');
-          setTimeout(() => window.location.reload(), 1500);
+          alert('IDをバックアップ時点のものに変更したよ！\n再読み込みしてね✨');
+          window.location.reload();
         }
-      } catch (error) { toast.error('読み込みエラー💦'); }
+      } catch (error) { alert('読み込みエラー: ' + error.message); }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -328,48 +305,34 @@ function App() {
   };
 
   const changeDeviceId = () => {
-    const newId = window.prompt('新しいデバイスID（空欄でランダム）:');
+    const newId = prompt('新しいデバイスID（空欄でランダム）:');
     if (newId === null) return;
     const finalId = newId.trim() === '' ? uuidv4() : newId.trim().replace(/\s/g, '');
     localStorage.setItem('deviceId', finalId);
     setDeviceId(finalId);
     setFolders([]); setMemos([]);
-    toast.success('IDを変更したよ！');
   };
   
   const loginWithId = () => {
     let input = loginInputId.trim().replace(/\s/g, '');
-    if (!input) return toast.error('IDが空だよ！');
+    if (!input) return alert('IDが空だよ！');
     localStorage.setItem('deviceId', input);
     setDeviceId(input);
     setShowLoginModal(false);
     setLoginInputId('');
     setFolders([]); setMemos([]);
-    toast.success('ログインしたよ！');
   };
 
   const toggleFolder = (folderId) => setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
-  
-  // 🛡️ ✨ 絶対にクラッシュしない最強の文字変換バリア ✨ 🛡️
-  const safeString = (val) => {
-    if (val === null || val === undefined) return '';
-    return String(val);
-  };
-
   const highlightText = (text) => {
-    const str = safeString(text);
-    if (!searchQuery || searchType !== 'text') return str;
+    if (!searchQuery || searchType !== 'text') return text;
     try {
       const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(${escaped})`, 'gi');
-      return str.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
-    } catch { return str; }
+      return text.split(regex).map((part, i) => regex.test(part) ? <mark key={i} style={{ background: t.main, color: 'white' }}>{part}</mark> : part);
+    } catch { return text; }
   };
-
-  const getTitle = (text) => {
-    const str = safeString(text);
-    return <span>{highlightText(str.split('\n')[0] || '（無題）')}</span>;
-  };
+  const getTitle = (text) => <span>{highlightText(text.split('\n')[0] || '（無題）')}</span>;
 
   const toggleSelectMemo = (id) => {
     setSelectedMemos(prev => {
@@ -383,16 +346,14 @@ function App() {
     if (!result.destination || result.source.droppableId === result.destination.droppableId) return;
     let newFolderId = result.destination.droppableId === 'uncategorized' ? '' : result.destination.droppableId.replace('folder-', '');
     
-    setMemos(prev => prev.map(m => String(m.id) === String(result.draggableId) ? { ...m, folder_id: newFolderId || null } : m));
-    
-    toast.promise(
-      fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId }),
-      { loading: '移動中...', success: '移動したよ！', error: 'エラー💦' }
-    );
+    // UIを先に更新！
+    setMemos(prev => prev.map(m => m.id === result.draggableId ? { ...m, folder_id: newFolderId || null } : m));
+    await fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId });
   };
 
   const scrollToInput = () => document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+  // Undo/Redo logic
   const undo = useCallback(() => {
     if (indexRef.current <= 0) return;
     const newIdx = indexRef.current - 1;
@@ -427,15 +388,41 @@ function App() {
 
   useEffect(() => {
     if (selectedMemo && history.length === 0) {
-      setHistory([safeString(selectedMemo.text)]);
+      setHistory([selectedMemo.text || '']);
       setHistoryIndex(0);
     }
   }, [selectedMemo]);
 
-  return (
+return (
     <div style={{ backgroundColor: t.bg, color: t.text, minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box' }}>
       
-      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: '#333', color: '#fff', fontWeight: 'bold' } }} />
+      {/* ✨ トースト通知をUIに合わせて超可愛くしたよ！ ✨ */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{ 
+          style: { 
+            borderRadius: '30px', // ころんと丸く
+            background: '#fff',   // 白背景
+            color: t.dark,        // 文字は濃いピンク
+            fontWeight: 'bold',
+            border: `3px solid ${t.light}`, // 薄いピンクの枠線
+            boxShadow: `0 6px 16px ${t.dark}33`, // 優しい影
+            padding: '12px 24px'
+          },
+          success: {
+            iconTheme: {
+              primary: t.main, // チェックマークの色
+              secondary: 'white',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ff4081',
+              secondary: 'white',
+            },
+          },
+        }} 
+      />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ background: `linear-gradient(135deg, ${t.main}, ${t.dark})`, padding: '16px 32px', borderRadius: '40px', boxShadow: `0 8px 20px ${t.dark}55, inset 0 0 20px rgba(255,255,255,0.3)`, border: '6px solid #fff', position: 'relative', display: 'inline-block' }}>
@@ -456,22 +443,22 @@ function App() {
               <FontAwesomeIcon icon="bars" />
             </button>
             {showMenu && (
-              <div style={{ position: 'absolute', right: 0, top: '60px', background: 'white', borderRadius: '20px', boxShadow: `0 10px 30px ${t.dark}66`, padding: '15px', zIndex: 1000, minWidth: '220px', border: `2px solid ${t.light}` }}>
-                <div style={{ fontWeight: 'bold', color: t.dark, marginBottom: '10px' }}>テーマ変更</div>
+              <div style={{ position: 'absolute', right: 0, top: '60px', background: 'white', borderRadius: '25px', boxShadow: `0 10px 30px ${t.dark}66`, padding: '15px', zIndex: 1000, minWidth: '220px', border: `3px solid ${t.light}` }}>
+                <div style={{ fontWeight: 'bold', color: t.dark, marginBottom: '10px', textAlign: 'center' }}>テーマ変更</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '15px' }}>
-                  <button onClick={() => {setTheme('pink'); setShowMenu(false)}} style={{ background: '#ff80ab', color: 'white', padding: '10px', borderRadius: '12px' }}>ピンク</button>
-                  <button onClick={() => {setTheme('blue'); setShowMenu(false)}} style={{ background: '#64b5f6', color: 'white', padding: '10px', borderRadius: '12px' }}>ブルー</button>
-                  <button onClick={() => {setTheme('green'); setShowMenu(false)}} style={{ background: '#81c784', color: 'white', padding: '10px', borderRadius: '12px' }}>グリーン</button>
-                  <button onClick={() => {setTheme('dark'); setShowMenu(false)}} style={{ background: '#757575', color: 'white', padding: '10px', borderRadius: '12px' }}>ダーク</button>
+                  <button onClick={() => {setTheme('pink'); setShowMenu(false)}} style={{ background: '#ff80ab', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ピンク</button>
+                  <button onClick={() => {setTheme('blue'); setShowMenu(false)}} style={{ background: '#64b5f6', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ブルー</button>
+                  <button onClick={() => {setTheme('green'); setShowMenu(false)}} style={{ background: '#81c784', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>グリーン</button>
+                  <button onClick={() => {setTheme('dark'); setShowMenu(false)}} style={{ background: '#757575', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ダーク</button>
                 </div>
-                <button onClick={() => {changeDeviceId(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>ID変更</button>
-                <button onClick={() => {setShowLoginModal(true); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '12px', marginBottom: '15px' }}>ログイン</button>
+                <button onClick={() => {changeDeviceId(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '16px', marginBottom: '8px', fontWeight: 'bold' }}>ID変更</button>
+                <button onClick={() => {setShowLoginModal(true); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '16px', marginBottom: '15px', fontWeight: 'bold' }}>ログイン</button>
                 
                 <div style={{ borderTop: `2px dashed ${t.light}`, paddingTop: '10px' }}>
-                  <button onClick={exportData} style={{ width: '100%', background: t.main, color: 'white', padding: '10px', borderRadius: '12px', marginBottom: '8px' }}>
+                  <button onClick={exportData} style={{ width: '100%', background: t.main, color: 'white', padding: '10px', borderRadius: '16px', marginBottom: '8px', fontWeight: 'bold' }}>
                     <FontAwesomeIcon icon="download" /> バックアップ保存
                   </button>
-                  <label style={{ width: '100%', background: '#ffb3c6', color: 'white', padding: '10px', borderRadius: '12px', display: 'block', textAlign: 'center', cursor: 'pointer', boxSizing: 'border-box' }}>
+                  <label style={{ width: '100%', background: t.dark, color: 'white', padding: '10px', borderRadius: '16px', display: 'block', textAlign: 'center', cursor: 'pointer', boxSizing: 'border-box', fontWeight: 'bold' }}>
                     <FontAwesomeIcon icon="upload" /> データ復元
                     <input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
                   </label>
@@ -482,66 +469,96 @@ function App() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '20px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
+      {/* ✨ 使い方（ヘルプ）モーダル完全復活＆ころんと丸く！ ✨ */}
+      {showHelp && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(255,182,193,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
+          <div style={{ background: 'white', borderRadius: '40px', padding: '30px', maxWidth: '520px', width: '100%', boxShadow: `0 20px 50px ${t.dark}55`, border: `6px solid ${t.light}`, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 20px 0', fontSize: '24px' }}>Cocotte の使い方</h3>
+            <div style={{ color: t.dark, fontSize: '15px', lineHeight: '1.9', background: t.bg, padding: '20px', borderRadius: '25px' }}>
+              <strong>・メモ追加</strong>: テキスト入力 → 色・フォルダ → 「追加」<br/>
+              <strong>・Undo/Redo</strong>: 編集中に Ctrl+Z / Ctrl+Y<br/>
+              <strong>・検索</strong>: 文字 / 日付 / フォルダ<br/>
+              <strong>・共有</strong>: 詳細 → 共有 → URLコピー<br/>
+              <strong>・ログイン</strong>: ID入力 <br/><br/>
+              
+              <strong style={{ color: '#d32f2f' }}>【重要】プライベートモードについて</strong><br/>
+              シークレットモードやプライベートブラウジングだと<br/>
+              「ID変更」や「ブラウザ更新」でIDがリセットされることがあります！<br/>
+              <strong>→ 別の場所（メモ帳やスクショ）にデバイスIDを保存しておくのが超おすすめ！</strong><br/>
+              （PWA化しても念のため保存しとくと安心）<br/><br/>
+      
+              <strong style={{ color: t.main }}>【超便利】PWAでアプリ化しよう！</strong><br/>
+              Safari（iPhone）やChromeなど（Android）からならホーム画面に追加すると<br/>
+              → ブラウザ開かずにワンタップで起動できるよ！
+            </div>
+            <button onClick={() => setShowHelp(false)} style={{ background: t.main, color: 'white', padding: '14px 40px', borderRadius: '30px', margin: '25px auto 0', display: 'block', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', boxShadow: `0 4px 12px ${t.main}66` }}>
+              わかった！
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* デバイスID表示 */}
+      <div style={{ marginBottom: '20px', padding: '16px 20px', background: t.light, borderRadius: '25px', boxShadow: `0 6px 18px ${t.dark}33`, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: t.dark, fontWeight: 'bold' }}>デバイスID</p>
-        <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '14px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all' }}>{deviceId}</p>
-        <button onClick={() => { navigator.clipboard.writeText(deviceId); toast.success('IDをコピーしたよ！'); }} style={{ marginTop: '10px', background: t.main, color: 'white', padding: '8px 16px', borderRadius: '12px', fontSize: '14px' }}>コピー</button>
+        <p style={{ margin: 0, fontFamily: 'monospace', background: '#fff', padding: '12px 16px', borderRadius: '18px', color: t.dark, fontWeight: 'bold', fontSize: '16px', wordBreak: 'break-all' }}>{deviceId}</p>
+        <button onClick={() => { navigator.clipboard.writeText(deviceId); toast.success('IDをコピーしたよ！'); }} style={{ marginTop: '12px', background: t.main, color: 'white', padding: '10px 24px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>コピー</button>
       </div>
 
-      <div style={{ background: t.light, padding: '20px', borderRadius: '20px', marginBottom: '20px', boxShadow: `0 6px 20px ${t.dark}33`, boxSizing: 'border-box' }}>
-        <textarea value={newMemo} onChange={(e) => setNewMemo(e.target.value)} placeholder="メモを入力（1行目がタイトル）..." rows="4" style={{ width: '100%', padding: '14px', borderRadius: '14px', border: `3px solid ${t.main}`, fontSize: '16px', resize: 'vertical', background: theme === 'dark' ? '#333' : 'white', color: t.text, boxSizing: 'border-box' }} />
+      <div style={{ background: t.light, padding: '24px', borderRadius: '30px', marginBottom: '20px', boxShadow: `0 6px 20px ${t.dark}33`, boxSizing: 'border-box' }}>
+        <textarea value={newMemo} onChange={(e) => setNewMemo(e.target.value)} placeholder="メモを入力（1行目がタイトル）..." rows="4" style={{ width: '100%', padding: '16px', borderRadius: '20px', border: `3px solid ${t.main}`, fontSize: '16px', resize: 'vertical', background: theme === 'dark' ? '#333' : 'white', color: t.text, boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '15px', alignItems: 'center' }}>
-          <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
+          <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, background: 'white', color: t.text, fontWeight: 'bold' }}>
             <option value="#ffffff">白</option><option value="#ffe6f0">ピンク</option><option value="#e3f2fd">水色</option><option value="#e6ffe6">グリーン</option>
           </select>
-          <select value={selectedFolderId} onChange={(e) => setSelectedFolderId(e.target.value)} style={{ flex: '1 1 140px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }}>
+          <select value={selectedFolderId} onChange={(e) => setSelectedFolderId(e.target.value)} style={{ flex: '1 1 140px', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, background: 'white', color: t.text, fontWeight: 'bold' }}>
             <option value="">未分類</option>
             {folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
           </select>
-          <label style={{ flex: '1 1 180px', background: selectedFile ? t.dark : t.main, color: 'white', padding: '14px 16px', borderRadius: '14px', cursor: 'pointer', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <label style={{ flex: '1 1 180px', background: selectedFile ? t.dark : t.main, color: 'white', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <FontAwesomeIcon icon="paperclip" /> {selectedFile ? selectedFile.name : 'ファイル(5MB迄)'}
             <input type="file" onChange={handleFileChange} accept="image/*,.pdf" style={{ display: 'none' }} />
           </label>
-          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="新フォルダ名" style={{ flex: '1 1 160px', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}`, background: 'white', color: t.text }} />
-          <button onClick={createFolder} style={{ background: t.main, color: 'white', padding: '14px 20px', borderRadius: '30px', fontWeight: 'bold' }}>作成</button>
-          <button onClick={addMemo} style={{ background: t.dark, color: 'white', padding: '14px 28px', borderRadius: '30px', fontWeight: 'bold' }}>追加</button>
+          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="新フォルダ名" style={{ flex: '1 1 160px', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, background: 'white', color: t.text }} />
+          <button onClick={createFolder} style={{ background: t.main, color: 'white', padding: '14px 24px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>作成</button>
+          <button onClick={addMemo} style={{ background: t.dark, color: 'white', padding: '14px 32px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>追加</button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0 30px 0', background: t.light, padding: '12px', borderRadius: '18px', flexWrap: 'wrap' }}>
-        <FontAwesomeIcon icon="search" style={{ color: t.main, fontSize: '20px' }} />
-        <select value={searchType} onChange={(e) => { setSearchType(e.target.value); setSearchQuery(''); setSelectedDate(null); setFolderSearchId(''); }} style={{ padding: '10px', border: `2px solid ${t.main}`, borderRadius: '12px', background: 'white', color: t.text }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0 30px 0', background: t.light, padding: '16px', borderRadius: '25px', flexWrap: 'wrap' }}>
+        <FontAwesomeIcon icon="search" style={{ color: t.main, fontSize: '20px', marginLeft: '8px' }} />
+        <select value={searchType} onChange={(e) => { setSearchType(e.target.value); setSearchQuery(''); setSelectedDate(null); setFolderSearchId(''); }} style={{ padding: '12px', border: `2px solid ${t.main}`, borderRadius: '18px', background: 'white', color: t.text, fontWeight: 'bold' }}>
           <option value="text">文字</option><option value="date">日付</option><option value="folder">フォルダ</option>
         </select>
-        {searchType === 'text' && <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="検索..." style={{ flex: '1 1 200px', padding: '10px', border: `2px solid ${t.main}`, borderRadius: '12px', background: 'white', color: t.text }} />}
-        {searchType === 'date' && <DatePicker selected={selectedDate} onChange={setSelectedDate} dateFormat="yyyy/MM/dd" placeholderText="日付を選択" style={{ flex: '1 1 200px', padding: '10px', border: `2px solid ${t.main}`, borderRadius: '12px', background: 'white', color: t.text }} />}
+        {searchType === 'text' && <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="検索..." style={{ flex: '1 1 200px', padding: '12px', border: `2px solid ${t.main}`, borderRadius: '18px', background: 'white', color: t.text }} />}
+        {searchType === 'date' && <DatePicker selected={selectedDate} onChange={setSelectedDate} dateFormat="yyyy/MM/dd" placeholderText="日付を選択" style={{ flex: '1 1 200px', padding: '12px', border: `2px solid ${t.main}`, borderRadius: '18px', background: 'white', color: t.text }} />}
         {searchType === 'folder' && (
-          <select value={folderSearchId} onChange={(e) => setFolderSearchId(e.target.value)} style={{ flex: '1 1 200px', padding: '10px', border: `2px solid ${t.main}`, borderRadius: '12px', background: 'white', color: t.text }}>
+          <select value={folderSearchId} onChange={(e) => setFolderSearchId(e.target.value)} style={{ flex: '1 1 200px', padding: '12px', border: `2px solid ${t.main}`, borderRadius: '18px', background: 'white', color: t.text, fontWeight: 'bold' }}>
             <option value="">全てのフォルダ</option>
             {folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
           </select>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <button onClick={() => setShowTrash(!showTrash)} style={{ background: t.main, color: 'white', padding: '10px 16px', borderRadius: '24px' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <button onClick={() => setShowTrash(!showTrash)} style={{ background: t.main, color: 'white', padding: '12px 20px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
           <FontAwesomeIcon icon="trash-alt" /> {showTrash ? '一覧に戻る' : 'ゴミ箱'}
         </button>
-        {showTrash && <button onClick={clearTrash} style={{ background: t.main, color: 'white', padding: '10px 16px', borderRadius: '24px' }}>空にする</button>}
-        <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedMemos(new Set()); }} style={{ background: t.main, color: 'white', padding: '10px 16px', borderRadius: '24px' }}>
+        {showTrash && <button onClick={clearTrash} style={{ background: t.main, color: 'white', padding: '12px 20px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>空にする</button>}
+        <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedMemos(new Set()); }} style={{ background: t.main, color: 'white', padding: '12px 20px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
           {isSelectMode ? '選択終了' : '選択モード'}
         </button>
       </div>
 
       {isSelectMode && selectedMemos.size > 0 && (
-        <button onClick={bulkDelete} style={{ background: '#d32f2f', color: 'white', margin: '12px 0', padding: '10px 20px', borderRadius: '28px' }}>選択した {selectedMemos.size} 件を削除</button>
+        <button onClick={bulkDelete} style={{ background: '#ff4081', color: 'white', margin: '12px 0', padding: '14px 24px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>選択した {selectedMemos.size} 件を削除</button>
       )}
 
       <button onClick={scrollToInput} style={{ position: 'fixed', right: '20px', bottom: '20px', background: t.dark, color: 'white', width: '64px', height: '64px', borderRadius: '50%', fontSize: '32px', boxShadow: `0 6px 25px ${t.dark}88`, zIndex: 100, border: 'none', cursor: 'pointer' }}>
         <FontAwesomeIcon icon="plus" />
       </button>
 
-      <h2 style={{ color: t.dark, margin: '20px 0 10px' }}>{showTrash ? 'ゴミ箱' : 'メモ一覧'}</h2>
+      <h2 style={{ color: t.dark, margin: '20px 0 16px', fontSize: '24px' }}>{showTrash ? 'ゴミ箱' : 'メモ一覧'}</h2>
 
       <DragDropContext onDragEnd={onDragEnd}>
         {!showTrash && (
@@ -551,11 +568,11 @@ function App() {
               const isOpen = openFolders[folder.id] || false;
               return (
                 <div key={String(folder.id)} style={{ marginBottom: '18px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', background: t.light, padding: '10px', borderRadius: '12px' }}>
-                    <div onClick={() => toggleFolder(folder.id)} style={{ cursor: 'pointer', fontWeight: 'bold', color: t.dark }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', background: t.light, padding: '14px 20px', borderRadius: '20px' }}>
+                    <div onClick={() => toggleFolder(folder.id)} style={{ cursor: 'pointer', fontWeight: 'bold', color: t.dark, fontSize: '16px' }}>
                       {folder.name} ({folderMemos.length})
                     </div>
-                    {isSelectMode && <button onClick={() => deleteFolder(folder.id)} style={{ background: t.main, color: 'white', padding: '6px 10px', borderRadius: '12px' }}>削除</button>}
+                    {isSelectMode && <button onClick={() => deleteFolder(folder.id)} style={{ background: t.main, color: 'white', padding: '6px 12px', borderRadius: '16px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>削除</button>}
                   </div>
                   {isOpen && (
                     <Droppable droppableId={`folder-${folder.id}`}>
@@ -564,10 +581,10 @@ function App() {
                           {folderMemos.map((memo, index) => (
                             <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                               {(provided, snapshot) => (
-                                <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '12px', cursor: isSelectMode ? 'default' : 'pointer', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: snapshot.isDragging ? `0 12px 28px ${t.main}77` : '0 2px 8px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden' }}>
-                                  {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
+                                <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '16px', margin: '8px 0', borderRadius: '20px', cursor: isSelectMode ? 'default' : 'pointer', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: snapshot.isDragging ? `0 12px 28px ${t.main}77` : '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
+                                  {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '12px', width: '18px', height: '18px', accentColor: t.main }} />}
                                   <div {...provided.dragHandleProps} style={{ position: 'absolute', left: 0, top: 0, width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab' }}>
-                                    <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px' }} />
+                                    <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px', opacity: 0.5 }} />
                                   </div>
                                   <strong style={{ marginLeft: '40px', flex: 1, fontSize: '16px' }}>{getTitle(memo.text)}</strong>
                                 </li>
@@ -583,7 +600,7 @@ function App() {
               );
             })}
             
-            <div style={{ background: t.light, padding: '10px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', color: t.dark }} onClick={() => setIsOpenUncategorized(!isOpenUncategorized)}>
+            <div style={{ background: t.light, padding: '14px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', color: t.dark, fontSize: '16px' }} onClick={() => setIsOpenUncategorized(!isOpenUncategorized)}>
               未分類 ({memos.filter(m => !m.folder_id).length})
             </div>
             {isOpenUncategorized && (
@@ -593,12 +610,12 @@ function App() {
                     {memos.filter(m => !m.folder_id).map((memo, index) => (
                       <Draggable key={String(memo.id)} draggableId={String(memo.id)} index={index}>
                         {(provided) => (
-                          <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '12px', display: 'flex', alignItems: 'center', color: t.dark, position: 'relative' }}>
-                            {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px', marginLeft: '40px' }} />}
+                          <li ref={provided.innerRef} {...provided.draggableProps} onClick={() => !isSelectMode && setSelectedMemo(memo)} style={{ ...provided.draggableProps.style, backgroundColor: memo.color, padding: '16px', margin: '8px 0', borderRadius: '20px', display: 'flex', alignItems: 'center', color: t.dark, position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '12px', marginLeft: '40px', width: '18px', height: '18px', accentColor: t.main }} />}
                             <div {...provided.dragHandleProps} style={{ position: 'absolute', left: 0, top: 0, width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px' }} />
+                              <div style={{ width: '6px', height: '24px', background: t.dark, borderRadius: '3px', opacity: 0.5 }} />
                             </div>
-                            <strong style={{ marginLeft: isSelectMode ? '0px' : '40px', flex: 1 }}>{getTitle(memo.text)}</strong>
+                            <strong style={{ marginLeft: isSelectMode ? '0px' : '40px', flex: 1, fontSize: '16px' }}>{getTitle(memo.text)}</strong>
                           </li>
                         )}
                       </Draggable>
@@ -615,54 +632,54 @@ function App() {
       {showTrash && (
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {memos.map(memo => (
-            <li key={String(memo.id)} style={{ backgroundColor: memo.color, padding: '12px', margin: '6px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', color: t.dark }}>
-              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '10px' }} />}
-              <strong>{getTitle(memo.text)}</strong>
-              <button onClick={() => restoreMemo(memo.id)} style={{ marginLeft: 'auto', background: t.main, color: 'white', padding: '8px 14px', borderRadius: '20px' }}>復元</button>
+            <li key={String(memo.id)} style={{ backgroundColor: memo.color, padding: '16px', margin: '8px 0', borderRadius: '20px', display: 'flex', alignItems: 'center', color: t.dark, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+              {isSelectMode && <input type="checkbox" checked={selectedMemos.has(String(memo.id))} onChange={() => toggleSelectMemo(String(memo.id))} onClick={(e) => e.stopPropagation()} style={{ marginRight: '12px', width: '18px', height: '18px', accentColor: t.main }} />}
+              <strong style={{ fontSize: '16px' }}>{getTitle(memo.text)}</strong>
+              <button onClick={() => restoreMemo(memo.id)} style={{ marginLeft: 'auto', background: t.main, color: 'white', padding: '10px 18px', borderRadius: '20px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>復元</button>
             </li>
           ))}
         </ul>
       )}
 
+      {/* メモ詳細モーダルも丸くしたよ！ */}
       {selectedMemo && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: `${t.main}ee`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px', boxSizing: 'border-box' }}>
-          <div style={{ background: 'white', borderRadius: '32px', padding: '24px 20px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <button onClick={() => setSelectedMemo(null)} style={{ alignSelf: 'flex-end', background: '#999', color: 'white', padding: '8px 16px', borderRadius: '20px', marginBottom: '12px' }}>✕ 閉じる</button>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(255,182,193,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
+          <div style={{ background: 'white', borderRadius: '40px', padding: '30px 24px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', border: `6px solid ${t.light}`, boxShadow: `0 20px 50px ${t.dark}55` }}>
+            <button onClick={() => setSelectedMemo(null)} style={{ alignSelf: 'flex-end', background: '#ccc', color: 'white', padding: '10px 20px', borderRadius: '25px', marginBottom: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>✕ 閉じる</button>
             
-            {/* 🛡️ モーダルのタイトルも安全仕様に修正！ */}
-            <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 18px', fontSize: '22px' }}>
+            <h3 style={{ color: t.dark, textAlign: 'center', margin: '0 0 20px', fontSize: '24px' }}>
               {getTitle(selectedMemo.text)}
             </h3>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
-              <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? t.light : t.main, color: 'white', padding: '14px 18px', borderRadius: '50%' }}><FontAwesomeIcon icon="undo" /></button>
-              <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ background: historyIndex >= history.length - 1 ? t.light : t.main, color: 'white', padding: '14px 18px', borderRadius: '50%' }}><FontAwesomeIcon icon="redo" /></button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '20px' }}>
+              <button onClick={undo} disabled={historyIndex <= 0} style={{ background: historyIndex <= 0 ? t.light : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', border: 'none', cursor: 'pointer' }}><FontAwesomeIcon icon="undo" /></button>
+              <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ background: historyIndex >= history.length - 1 ? t.light : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', border: 'none', cursor: 'pointer' }}><FontAwesomeIcon icon="redo" /></button>
             </div>
             
-            <textarea ref={textareaRef} value={safeString(selectedMemo.text)} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '16px', border: `3px solid ${t.main}`, borderRadius: '16px', fontSize: '16px', boxSizing: 'border-box' }} />
+            <textarea ref={textareaRef} value={safeString(selectedMemo.text)} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '20px', border: `3px solid ${t.main}`, borderRadius: '25px', fontSize: '16px', boxSizing: 'border-box', background: t.bg, color: t.dark }} />
             
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '15px' }}>
-              <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '20px' }}>
+              <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, fontWeight: 'bold', color: t.dark }}>
                 <option value="#ffffff">白</option><option value="#ffe6f0">ピンク</option><option value="#e3f2fd">水色</option><option value="#e6ffe6">グリーン</option>
               </select>
-              <select value={selectedMemo.folder_id || ''} onChange={(e) => setSelectedMemo(prev => ({ ...prev, folder_id: e.target.value || null }))} style={{ flex: '1', padding: '14px', borderRadius: '14px', border: `2px solid ${t.main}` }}>
+              <select value={selectedMemo.folder_id || ''} onChange={(e) => setSelectedMemo(prev => ({ ...prev, folder_id: e.target.value || null }))} style={{ flex: '1', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, fontWeight: 'bold', color: t.dark }}>
                 <option value="">未分類</option>{folders.map(f => <option key={String(f.id)} value={String(f.id)}>{f.name}</option>)}
               </select>
-              <label style={{ flex: '1 1 100%', background: selectedMemo.file_url ? t.dark : t.main, color: 'white', padding: '14px', borderRadius: '14px', textAlign: 'center', cursor: 'pointer' }}>
+              <label style={{ flex: '1 1 100%', background: selectedMemo.file_url ? t.dark : t.main, color: 'white', padding: '16px', borderRadius: '25px', textAlign: 'center', cursor: 'pointer', fontWeight: 'bold' }}>
                 <FontAwesomeIcon icon="paperclip" /> {selectedMemo.file_url ? 'ファイル再選択' : 'ファイル添付'}
                 <input type="file" onChange={(e) => { if (e.target.files[0]) setSelectedFile(e.target.files[0]); }} style={{ display: 'none' }} />
               </label>
             </div>
             
             {selectedMemo.file_url && (
-              <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <a href={selectedMemo.file_url} target="_blank" rel="noopener noreferrer" style={{ color: t.dark, fontWeight: 'bold' }}>添付ファイルを見る</a>
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <a href={selectedMemo.file_url} target="_blank" rel="noopener noreferrer" style={{ color: t.main, fontWeight: 'bold', textDecoration: 'underline' }}>添付ファイルを見る</a>
               </div>
             )}
 
-            <div style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button onClick={updateMemo} style={{ background: t.dark, color: 'white', padding: '14px 30px', borderRadius: '30px' }}>保存</button>
-              <button onClick={() => deleteMemo(selectedMemo.id)} style={{ background: '#d32f2f', color: 'white', padding: '14px 30px', borderRadius: '30px' }}>削除</button>
+            <div style={{ marginTop: '30px', display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button onClick={updateMemo} style={{ background: t.dark, color: 'white', padding: '16px 40px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>保存</button>
+              <button onClick={() => deleteMemo(selectedMemo.id)} style={{ background: '#ff4081', color: 'white', padding: '16px 40px', borderRadius: '30px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>削除</button>
             </div>
           </div>
         </div>
