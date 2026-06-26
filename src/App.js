@@ -91,7 +91,6 @@ function App() {
     }
   };
 
-  // ✨ 検索・並び替えフィルターをまとめる関数 ✨
   const applyFilters = useCallback((allMemos) => {
     let filtered = allMemos.filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
     if (searchType === 'text' && searchQuery) {
@@ -112,34 +111,27 @@ function App() {
     return filtered;
   }, [showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
 
-  // 🚀 爆速キャッシュ＆データ取得ロジック 🚀
   const fetchData = useCallback(async () => {
     if (!deviceId) return;
 
-    // ① みつきの天才的アイデア：キャッシュを一瞬で表示！
+    // ① キャッシュから一瞬で表示！
     const cachedFolders = localStorage.getItem(`folders_${deviceId}`);
     const cachedMemos = localStorage.getItem(`memos_${deviceId}`);
-    
     if (cachedFolders) setFolders(JSON.parse(cachedFolders));
-    if (cachedMemos) {
-      const parsedMemos = JSON.parse(cachedMemos);
-      setMemos(applyFilters(parsedMemos));
-    }
+    if (cachedMemos) setMemos(applyFilters(JSON.parse(cachedMemos)));
 
-    // ② 裏側でこっそりGASと通信して最新化する！
+    // ② 裏側でこっそりGASと通信
     try {
       const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
       if (folderRes) {
-        const freshFolders = folderRes.data || [];
-        setFolders(freshFolders);
-        localStorage.setItem(`folders_${deviceId}`, JSON.stringify(freshFolders)); // キャッシュ更新
+        setFolders(folderRes.data || []);
+        localStorage.setItem(`folders_${deviceId}`, JSON.stringify(folderRes.data || []));
       }
 
       const memoRes = await fetchGas({ action: 'getMemos', deviceId });
       if (memoRes) {
-        const allMemos = memoRes.data || [];
-        localStorage.setItem(`memos_${deviceId}`, JSON.stringify(allMemos)); // キャッシュ更新
-        setMemos(applyFilters(allMemos));
+        localStorage.setItem(`memos_${deviceId}`, JSON.stringify(memoRes.data || []));
+        setMemos(applyFilters(memoRes.data || []));
       }
     } catch (e) {
       console.error('読み込み失敗:', e);
@@ -161,11 +153,8 @@ function App() {
     if (!newFolderName.trim() || !deviceId) return;
     const newFolder = { id: uuidv4(), name: newFolderName.trim(), device_id: getFolderDeviceId(deviceId) };
     
-    setFolders(prev => {
-      const updated = [...prev, newFolder];
-      localStorage.setItem(`folders_${deviceId}`, JSON.stringify(updated)); // 即座にキャッシュ
-      return updated;
-    });
+    // 即時反映！全件取り直しはしない！
+    setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');
     
     toast.promise(
@@ -178,17 +167,13 @@ function App() {
     if (!isSelectMode) return;
     if (!window.confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
 
-    setFolders(prev => {
-      const updated = prev.filter(f => String(f.id) !== String(folderId));
-      localStorage.setItem(`folders_${deviceId}`, JSON.stringify(updated));
-      return updated;
-    });
+    setFolders(prev => prev.filter(f => String(f.id) !== String(folderId)));
     setMemos(prev => prev.map(m => String(m.folder_id) === String(folderId) ? { ...m, folder_id: null } : m));
     
     toast.promise(
       fetchGas({ action: 'deleteFolder', folderId }),
       { loading: '削除中...', success: '削除したよ！', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
@@ -217,15 +202,19 @@ function App() {
       folder_id: selectedFolderId || '',
     };
 
+    // ✨ 即時反映！一瞬で表示！
     setMemos(prev => [newMemoObj, ...prev]);
     setNewMemo('');
     setSelectedFile(null);
     setSelectedFolderId('');
 
+    // 裏で保存。取り直しはしない！（画像がある時だけ4秒後にURLもらうために取り直す）
     toast.promise(
       fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName }),
       { loading: '保存中...', success: 'メモを追加したよ！', error: '保存エラー💦' }
-    ).then(() => fetchData()); 
+    ).then(() => {
+      if (fileData) setTimeout(() => fetchData(), 4000); 
+    });
   };
 
   const updateMemo = async () => {
@@ -248,7 +237,9 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName }),
       { loading: '更新中...', success: '更新したよ！', error: '更新エラー💦' }
-    ).then(() => fetchData());
+    ).then(() => {
+      if (fileData) setTimeout(() => fetchData(), 4000);
+    });
   };
 
   const deleteMemo = async (id) => {
@@ -258,7 +249,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true }),
       { loading: '削除中...', success: 'ゴミ箱に入れたよ', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const bulkDelete = async () => {
@@ -273,7 +264,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'deleteMemos', ids: idsArray }),
       { loading: '一括削除中...', success: '削除したよ！', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const restoreMemo = async (id) => {
@@ -281,7 +272,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false }),
       { loading: '復元中...', success: '復元したよ！', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const clearTrash = async () => {
@@ -290,7 +281,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'clearTrash', deviceId }),
       { loading: 'お掃除中...', success: 'ゴミ箱を空にしたよ！', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const shareMemo = async (id) => {
@@ -412,7 +403,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId }),
       { loading: '移動中...', success: '移動したよ！', error: 'エラー💦' }
-    ).then(() => fetchData());
+    );
   };
 
   const scrollToInput = () => document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
