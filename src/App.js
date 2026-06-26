@@ -6,7 +6,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import toast, { Toaster } from 'react-hot-toast'; // ✨ トースト
+import toast, { Toaster } from 'react-hot-toast';
 library.add(fas);
 
 // みつきのGAS URL！
@@ -15,7 +15,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyq_kqREkoL8e0XyHsP25Dl
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
 
 function App() {
-  console.log("🌸 最新のコードが動いてるよー！！");
   const [memos, setMemos] = useState([]);
   const [newMemo, setNewMemo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,37 +91,60 @@ function App() {
     }
   };
 
+  // ✨ 検索・並び替えフィルターをまとめる関数 ✨
+  const applyFilters = useCallback((allMemos) => {
+    let filtered = allMemos.filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
+    if (searchType === 'text' && searchQuery) {
+      filtered = filtered.filter(m => String(m.text || '').toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    if (searchType === 'date' && selectedDate) {
+      const start = new Date(selectedDate).setHours(0,0,0,0);
+      const end = new Date(selectedDate).setHours(23,59,59,999);
+      filtered = filtered.filter(m => {
+        const d = new Date(m.created_at).getTime();
+        return d >= start && d <= end;
+      });
+    }
+    if (folderSearchId) {
+      filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
+    }
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return filtered;
+  }, [showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
+
+  // 🚀 爆速キャッシュ＆データ取得ロジック 🚀
   const fetchData = useCallback(async () => {
     if (!deviceId) return;
+
+    // ① みつきの天才的アイデア：キャッシュを一瞬で表示！
+    const cachedFolders = localStorage.getItem(`folders_${deviceId}`);
+    const cachedMemos = localStorage.getItem(`memos_${deviceId}`);
+    
+    if (cachedFolders) setFolders(JSON.parse(cachedFolders));
+    if (cachedMemos) {
+      const parsedMemos = JSON.parse(cachedMemos);
+      setMemos(applyFilters(parsedMemos));
+    }
+
+    // ② 裏側でこっそりGASと通信して最新化する！
     try {
       const folderRes = await fetchGas({ action: 'getFolders', deviceId: getFolderDeviceId(deviceId) });
-      if (folderRes) setFolders(folderRes.data || []);
+      if (folderRes) {
+        const freshFolders = folderRes.data || [];
+        setFolders(freshFolders);
+        localStorage.setItem(`folders_${deviceId}`, JSON.stringify(freshFolders)); // キャッシュ更新
+      }
 
       const memoRes = await fetchGas({ action: 'getMemos', deviceId });
       if (memoRes) {
-        let filtered = (memoRes.data || []).filter(m => (m.is_deleted === true || m.is_deleted === 'true') === showTrash);
-        
-        if (searchType === 'text' && searchQuery) {
-          filtered = filtered.filter(m => String(m.text || '').toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        if (searchType === 'date' && selectedDate) {
-          const start = new Date(selectedDate).setHours(0,0,0,0);
-          const end = new Date(selectedDate).setHours(23,59,59,999);
-          filtered = filtered.filter(m => {
-            const d = new Date(m.created_at).getTime();
-            return d >= start && d <= end;
-          });
-        }
-        if (folderSearchId) {
-          filtered = filtered.filter(m => String(m.folder_id) === String(folderSearchId));
-        }
-        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        setMemos(filtered);
+        const allMemos = memoRes.data || [];
+        localStorage.setItem(`memos_${deviceId}`, JSON.stringify(allMemos)); // キャッシュ更新
+        setMemos(applyFilters(allMemos));
       }
     } catch (e) {
       console.error('読み込み失敗:', e);
     }
-  }, [deviceId, showTrash, searchType, searchQuery, selectedDate, folderSearchId]);
+  }, [deviceId, applyFilters]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -139,7 +161,11 @@ function App() {
     if (!newFolderName.trim() || !deviceId) return;
     const newFolder = { id: uuidv4(), name: newFolderName.trim(), device_id: getFolderDeviceId(deviceId) };
     
-    setFolders(prev => [...prev, newFolder]);
+    setFolders(prev => {
+      const updated = [...prev, newFolder];
+      localStorage.setItem(`folders_${deviceId}`, JSON.stringify(updated)); // 即座にキャッシュ
+      return updated;
+    });
     setNewFolderName('');
     
     toast.promise(
@@ -152,13 +178,17 @@ function App() {
     if (!isSelectMode) return;
     if (!window.confirm('フォルダを削除しますか？（メモは未分類へ移動）')) return;
 
-    setFolders(prev => prev.filter(f => String(f.id) !== String(folderId)));
+    setFolders(prev => {
+      const updated = prev.filter(f => String(f.id) !== String(folderId));
+      localStorage.setItem(`folders_${deviceId}`, JSON.stringify(updated));
+      return updated;
+    });
     setMemos(prev => prev.map(m => String(m.folder_id) === String(folderId) ? { ...m, folder_id: null } : m));
     
     toast.promise(
       fetchGas({ action: 'deleteFolder', folderId }),
       { loading: '削除中...', success: '削除したよ！', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
@@ -195,9 +225,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'addMemo', memo: newMemoObj, fileData, fileName }),
       { loading: '保存中...', success: 'メモを追加したよ！', error: '保存エラー💦' }
-    ).then(() => {
-      if (fileData) fetchData(); 
-    });
+    ).then(() => fetchData()); 
   };
 
   const updateMemo = async () => {
@@ -220,9 +248,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemo', memo: updated, fileData, fileName }),
       { loading: '更新中...', success: '更新したよ！', error: '更新エラー💦' }
-    ).then(() => {
-      if (fileData) fetchData();
-    });
+    ).then(() => fetchData());
   };
 
   const deleteMemo = async (id) => {
@@ -232,7 +258,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: true }),
       { loading: '削除中...', success: 'ゴミ箱に入れたよ', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const bulkDelete = async () => {
@@ -247,7 +273,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'deleteMemos', ids: idsArray }),
       { loading: '一括削除中...', success: '削除したよ！', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const restoreMemo = async (id) => {
@@ -255,7 +281,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id, field: 'is_deleted', value: false }),
       { loading: '復元中...', success: '復元したよ！', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const clearTrash = async () => {
@@ -264,7 +290,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'clearTrash', deviceId }),
       { loading: 'お掃除中...', success: 'ゴミ箱を空にしたよ！', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const shareMemo = async (id) => {
@@ -349,7 +375,6 @@ function App() {
 
   const toggleFolder = (folderId) => setOpenFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
   
-  // 🛡️ e.split エラー完全防御
   const safeString = (val) => {
     if (val === null || val === undefined) return '';
     return String(val);
@@ -387,7 +412,7 @@ function App() {
     toast.promise(
       fetchGas({ action: 'updateMemoStatus', id: result.draggableId, field: 'folder_id', value: newFolderId }),
       { loading: '移動中...', success: '移動したよ！', error: 'エラー💦' }
-    );
+    ).then(() => fetchData());
   };
 
   const scrollToInput = () => document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -434,7 +459,7 @@ function App() {
   return (
     <div style={{ backgroundColor: t.bg, color: t.text, minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box' }}>
       
-      {/* ✨ トースト通知をUIに合わせて超可愛くしたよ！ ✨ */}
+      {/* ✨ トースト通知 */}
       <Toaster 
         position="top-center" 
         toastOptions={{ 
@@ -474,10 +499,10 @@ function App() {
               <div style={{ position: 'absolute', right: 0, top: '60px', background: 'white', borderRadius: '25px', boxShadow: `0 10px 30px ${t.dark}66`, padding: '15px', zIndex: 1000, minWidth: '220px', border: `3px solid ${t.light}` }}>
                 <div style={{ fontWeight: 'bold', color: t.dark, marginBottom: '10px', textAlign: 'center' }}>テーマ変更</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '15px' }}>
-                  <button onClick={() => {setTheme('pink'); setShowMenu(false)}} style={{ background: '#ff80ab', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ピンク</button>
-                  <button onClick={() => {setTheme('blue'); setShowMenu(false)}} style={{ background: '#64b5f6', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ブルー</button>
-                  <button onClick={() => {setTheme('green'); setShowMenu(false)}} style={{ background: '#81c784', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>グリーン</button>
-                  <button onClick={() => {setTheme('dark'); setShowMenu(false)}} style={{ background: '#757575', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold' }}>ダーク</button>
+                  <button onClick={() => {setTheme('pink'); setShowMenu(false)}} style={{ background: '#ff80ab', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>ピンク</button>
+                  <button onClick={() => {setTheme('blue'); setShowMenu(false)}} style={{ background: '#64b5f6', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>ブルー</button>
+                  <button onClick={() => {setTheme('green'); setShowMenu(false)}} style={{ background: '#81c784', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>グリーン</button>
+                  <button onClick={() => {setTheme('dark'); setShowMenu(false)}} style={{ background: '#757575', color: 'white', padding: '10px', borderRadius: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>ダーク</button>
                 </div>
                 <button onClick={() => {changeDeviceId(); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '16px', marginBottom: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>ID変更</button>
                 <button onClick={() => {setShowLoginModal(true); setShowMenu(false)}} style={{ width: '100%', background: t.light, color: t.dark, padding: '10px', borderRadius: '16px', marginBottom: '15px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>ログイン</button>
@@ -497,7 +522,6 @@ function App() {
         </div>
       </div>
 
-      {/* ✨ 使い方（ヘルプ）モーダル完全復活＆ころんと丸く！ ✨ */}
       {showHelp && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(255,182,193,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
           <div style={{ background: 'white', borderRadius: '40px', padding: '30px', maxWidth: '520px', width: '100%', boxShadow: `0 20px 50px ${t.dark}55`, border: `6px solid ${t.light}`, maxHeight: '90vh', overflowY: 'auto' }}>
@@ -526,7 +550,6 @@ function App() {
         </div>
       )}
 
-      {/* ログインモーダル */}
       {showLoginModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(255,182,193,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
           <div style={{ background: 'white', borderRadius: '40px', padding: '30px', maxWidth: '420px', width: '100%', boxShadow: `0 20px 50px ${t.dark}55`, border: `6px solid ${t.light}` }}>
@@ -545,7 +568,7 @@ function App() {
       </div>
 
       <div style={{ background: t.light, padding: '24px', borderRadius: '30px', marginBottom: '20px', boxShadow: `0 6px 20px ${t.dark}33`, boxSizing: 'border-box' }}>
-        <textarea value={newMemo} onChange={(e) => setNewMemo(e.target.value)} placeholder="メモを入力（1行目がタイトル）..." rows="4" style={{ width: '100%', padding: '16px', borderRadius: '20px', border: `3px solid ${t.main}`, fontSize: '16px', resize: 'vertical', background: theme === 'dark' ? '#333' : 'white', color: t.text, boxSizing: 'border-box' }} />
+        <textarea value={newMemo} onChange={(e) => setNewMemo(e.target.value)} placeholder="メモを入力（1行目がタイトル）..." rows="4" style={{ width: '100%', padding: '16px', borderRadius: '20px', border: `3px solid ${t.main}`, fontSize: '16px', resize: 'vertical', background: theme === 'dark' ? '#333' : 'white', color: t.text, boxSizing: 'border-box', outline: 'none' }} />
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '15px', alignItems: 'center' }}>
           <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} style={{ flex: '1 1 120px', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, background: 'white', color: t.text, fontWeight: 'bold' }}>
             <option value="#ffffff">白</option><option value="#ffe6f0">ピンク</option><option value="#e3f2fd">水色</option><option value="#e6ffe6">グリーン</option>
@@ -694,7 +717,7 @@ function App() {
               <button onClick={redo} disabled={historyIndex >= history.length - 1} style={{ background: historyIndex >= history.length - 1 ? t.light : t.main, color: 'white', padding: '16px 20px', borderRadius: '50%', border: 'none', cursor: 'pointer' }}><FontAwesomeIcon icon="redo" /></button>
             </div>
             
-            <textarea ref={textareaRef} value={safeString(selectedMemo.text)} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '20px', border: `3px solid ${t.main}`, borderRadius: '25px', fontSize: '16px', boxSizing: 'border-box', background: t.bg, color: t.dark }} />
+            <textarea ref={textareaRef} value={safeString(selectedMemo.text)} onChange={(e) => { setSelectedMemo(prev => ({ ...prev, text: e.target.value })); addToHistory(e.target.value); }} rows="10" style={{ width: '100%', padding: '20px', border: `3px solid ${t.main}`, borderRadius: '25px', fontSize: '16px', boxSizing: 'border-box', background: t.bg, color: t.dark, outline: 'none' }} />
             
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '20px' }}>
               <select value={selectedMemo.color} onChange={(e) => setSelectedMemo(prev => ({ ...prev, color: e.target.value }))} style={{ flex: '1', padding: '14px', borderRadius: '20px', border: `2px solid ${t.main}`, fontWeight: 'bold', color: t.dark }}>
